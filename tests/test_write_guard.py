@@ -40,6 +40,9 @@ def test_lehrstoff_eintragen_testlauf_no_write(monkeypatch, capsys):
     out = capsys.readouterr()
     assert "TESTLAUF" in out.out
     assert "Schreiben mit --ausfuehren" in out.err
+    # Testlauf (nur --ausfuehren fehlt) zeigt KEINE Hilfe.
+    assert "usage:" not in out.out
+    assert "usage:" not in out.err
 
 
 def test_lehrstoff_eintragen_ausfuehren_writes(monkeypatch, capsys):

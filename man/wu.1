@@ -171,9 +171,23 @@ Entwickler-Escape-Hatch.
 .RI [ roster " | " faecher " | " kv ]
 .RI [ OPTIONEN ]
 .PP
-Ohne Unterbefehl: Klassen-Uebersicht mit Klassenvorstand (KV aus den
-Lehrer-Positionen teacher1/2/3), allen Lessons der Klasse aus dem
-Stundenplan und Roster.
+Ohne Unterbefehl: Klassen-Kopf mit Klassenvorstand (KV aus den
+Lehrer-Positionen teacher1/2/3), der
+.B klassen-id
+und dem Klassennamen. Fächer (alle Lessons aus dem Stundenplan) und
+Roster erscheinen nur mit
+.BR \-\-details ;
+.B \-\-fach
+impliziert
+.BR \-\-details .
+Die
+.B klassen-id
+ist der Wert fuer
+.BR \-\-klassen-id .
+.TP
+.B \-\-details
+Zusaetzlich Faecher und Roster zeigen (Standard ist nur der Kopf:
+Name, klassen-id, KV).
 .TP
 .B roster
 Schuelerliste des aktuellen Rosters (volle Namen, sortiert) als TSV
@@ -248,9 +262,11 @@ Roster- vs. Anwesenheits-Verteilung je Klasse.
 Schueler in die Anwesenheit der Lesson aufnehmen: setzt seine Termine
 auf alle Lesson-Termine und schickt die kombinierte Payload (Schueler
 der Lesson-Heimatklasse unveraendert + aufgenommener Schueler).
-Braucht
-.BR \-\-klassen-id
-(Heimatklasse der Lesson) plus
+.B \-\-klassen-id
+(Heimatklasse der Lesson) ist optional und wird sonst aus der Lesson
+abgeleitet (Quelle: `lessonKlassen` der Matrix; Fallback ueber die
+Klassen der Anwesenden — die abgeleitete ID wird nach stderr gemeldet).
+Dazu
 .B \-\-schueler-id
 oder
 .B \-\-schueler-name
@@ -265,6 +281,9 @@ Aufnehmen und/oder Entfernen in einem Write (volle Edit-Semantik:
 bereits anwesende Schueler jeder Klasse bleiben \(em sie zu streichen
 wuede sie abmelden; Entfernte verlieren alle Termine; Aufgenommene
 erhalten alle Lesson-Termine).
+.B \-\-klassen-id
+ist optional (Ableitung wie bei
+.BR aufnehmen ).
 .B \-\-aufnehmen-id
 und
 .B \-\-entfernen-id
@@ -552,12 +571,19 @@ Wirklich schreiben (Write).
 .TP
 .B \-\-klassen-id \fIKLASSEN_ID
 Klassen-ID (fuer
-.BR aufnehmen / anpassen / matrix ;
-per
-.B \-\-json
-- oder
+.BR aufnehmen / anpassen / matrix ).
+Bei
+.B aufnehmen
+und
+.B anpassen
+optional: fehlt sie, wird die Heimatklasse aus der Lesson abgeleitet
+(`lessonKlassen`). Fuers Vorkommen in
+.B "klasse"
+gibt der Kopf die
+.B klassen-id
+aus (per
 .B intern
--Aufrufen ermittelbar).
+-Aufrufen ebenfalls ermittelbar).
 .TP
 .B \-\-termin-id \fIPERIOD_ID
 Termin-ID (periodId).
@@ -579,9 +605,22 @@ Batch-JSON-Datei fuer
 TSV ohne Kopfzeile (fuer
 .BR roster ).
 .TP
+.B \-\-details
+Zusatzdetails: fuer
+.B klasse
+(ohne Unterbefehl) Faecher und Roster; fuer
+.B student
+KV/Faecher/Absenzen; fuer
+.BR "aufnehmen/anpassen" /
+.BR "lehrstoff aus-git"
+die volle Payload bzw. Diffs (Testlauf-Ausgabe).
+.TP
 .B \-\-fach \fIPRAEFIX\fB, \fB\-\-volle-namen
 Filter und Lehrer-Vollnamen (fuer
-.BR "klasse faecher" ).
+.BR "klasse faecher" );
+.B \-\-fach
+impliziert
+.BR \-\-details .
 .SH ARBEITSABLAEUFE
 .SS Fehlende Lehrstoffe nachtragen
 .EX
@@ -614,14 +653,18 @@ wu lesson 5XZY/SWP1x absenzen entfernen \\
 .EE
 .SS Neuen Schueler in eine Lesson aufnehmen
 .EX
+wu klasse 3BAIF
 wu student "Erika Muster"
-wu lesson 5XZY/SWP1x anpassen --aufnehmen-id STUDENT_ID \\
-    --klassen-id CLASS_ID
+wu lesson --lsid LESSON_ID aufnehmen --schueler-name "Erika Muster"
+wu lesson --lsid LESSON_ID aufnehmen --schueler-name "Erika Muster" \\
+    --ausfuehren
 wu lesson 5XZY/SWP1x anpassen --aufnehmen-id STUDENT_ID \\
     --klassen-id CLASS_ID --ausfuehren
 .EE
 .PP
-Erst Testlauf (zeigt die volle Payload, mit
+Die Heimatklasse wird aus der Lesson abgeleitet (die abgeleitete
+klassen-id steht nach stderr); `klasse KLASSE` zeigt die klassen-id im
+Kopf. Erst Testlauf (zeigt die volle Payload, mit
 .B \-\-details
 im Detail), dann
 .BR \-\-ausfuehren .
@@ -744,6 +787,23 @@ um
 .I src
 erweitert.
 .SH HINWEISE UND FALLEN
+.TP
+.B ID-Bezeichner klein geschrieben
+In der Textausgabe heissen ID-Felder klein und folgen dem Flag
+.RB ( lsid ,
+klassen-id
+,
+termin-id
+,
+thema-id
+,
+absenz-id , ...),
+damit sie sich direkt als Option weiterverwenden lassen. JSON-Keys
+bleiben englisch-camelCase
+.RB ( lsId ,
+classId ,
+...)
+fuer die maschinelle Weiterverarbeitung.
 .TP
 .B IP-Rate-Limit (TCP-Resets, kein HTTP 429)
 WebUntis drosselt pro IP auf TCP-Ebene: nach ca. 50 schnellen Calls

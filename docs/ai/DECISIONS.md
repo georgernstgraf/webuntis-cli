@@ -296,6 +296,55 @@ Superseded decisions are relocated to HISTORY.md.
   Detailblock setzten, müssen `--details` ergänzen; spart pro Treffer
   ~4 API-Calls (`_kv_info` + `_faecher_aus_plaenen`).
 
+## 2026-09-27: `klasse`-Default kurz + klassen-id immer im Kopf
+- **Choice**: `wu klasse KLASSE` (ohne Unterbefehl) zeigt standardmäßig
+  nur den Kopf: Klassenname, `klassen-id` (der Wert für
+  `--klassen-id`) und KV. Fächer und Roster erscheinen nur mit
+  `--details`; `--fach` impliziert `--details`. `--json` liefert den Kopf
+  (`class`/`classId`/`longName`/`kv`) immer, `range`/`lessons`/`students`
+  nur mit `--details`.
+- **Reason**: Nutzer-Vorgabe — die class-id wird fürs Aufnehmen
+  gebraucht, war aber aus der Textausgabe nicht ermittelbar; Roster/
+  Fächer sind selten nötig und kosteten Plan-/Overview-Calls.
+- **Considered**: class-id nur per `--json`/`intern` (abgelehnt — der
+  Nutzer will sie im normalen Aufruf sehen); KV ebenfalls hinter
+  `--details` (abgelehnt — KV gehört laut Nutzer zum „Kopf").
+- **Tradeoff**: bestehende Skripte, die `klasse --json` auf `lessons`/
+  `students` setzten, brauchen `--details`; Default spart die
+  Stundenplan- und Overview-Calls.
+
+## 2026-09-27: `--klassen-id` bei `aufnehmen`/`anpassen` optional (Ableitung)
+- **Choice**: `lesson … aufnehmen/anpassen` leitet die Heimatklasse
+  automatisch aus der Matrix ab (`lessonKlassen`; Fallback: Klassen der
+  anwesenden Schüler), wenn `--klassen-id` fehlt. `--klassen-id`
+  überschreibt weiterhin. `_build_students_payload` nimmt jetzt eine
+  Menge `class_ids`. Die abgeleitete ID wird nach stderr gemeldet; ist
+  nichts ableitbar, warnt der Befehl und es bleiben nur Anwesende.
+- **Reason**: Nutzer-Beispiel `wu lesson --lsid X aufnehmen
+  --schueler-name …` scheiterte an der Pflicht `--klassen-id`, obwohl
+  die Information in der Lesson-Matrix steckt.
+- **Considered**: `--klassen-id` Pflicht lassen und nur `klasse` die ID
+  zeigen (abgelehnt — der Nutzer will den Aufruf ohne Zusatzflag);
+  `allKlassen` als Primärquelle (abgelehnt — das sind ALLE Klassen der
+  Schule, `lessonKlassen` ist die Lesson-Menge).
+- **Tradeoff**: `lessonKlassen`-Form ist aus dem Mitschnitt nicht belegt
+  → defensiv (dict/int) plus Attendee-Fallback; Multi-Klassen-Lessons
+  werden jetzt korrekt als Menge behandelt.
+
+## 2026-09-27: Text-ID-Labels klein (JSON-Keys unverändert)
+- **Choice**: In der menschenlesbaren Ausgabe heißen ID-Bezeichner klein
+  und folgen dem Flag (`lsid`, `klassen-id`, `termin-id`, `thema-id`,
+  `absenz-id`; `mainstudentgroupid`, `lehrer-id`). JSON-Keys bleiben
+  englisch-camelCase (`lsId`, `classId`, …).
+- **Reason**: Nutzer-Vorgabe — das Programm druckte `lsId`/`classId`,
+  erwartet als Option aber `lsid`/`--klassen-id`; kopierte Bezeichner
+  sollen direkt passen.
+- **Considered**: auch JSON-Keys kleinschreiben (abgelehnt — bricht das
+  `fill-open-periods`-Skill-Parsing und die dokumentierte Entscheidung
+  „JSON-Keys bleiben englisch").
+- **Tradeoff**: gemischte Konvention (Text klein, JSON camelCase) ist
+  bewusst und in CONVENTIONS.md/man/wu.1 dokumentiert.
+
 
 
 

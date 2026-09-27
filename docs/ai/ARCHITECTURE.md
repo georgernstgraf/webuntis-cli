@@ -1,7 +1,8 @@
 # Architecture
 
-Living structural map of the system as of 2026-09-21 (nach Man-Page +
-offen-Default). Overwritten when structural changes occur during a session.
+Living structural map of the system as of 2026-09-27 (nach klasse-Kopf +
+klassen-id-Ableitung). Overwritten when structural changes occur during a
+session.
 
 ## Overview
 
@@ -43,7 +44,7 @@ fill-open-periods workflow with human confirmation.
 
 | Command | Purpose |
 |---------|---------|
-| `klasse KLASSE` | Übersicht: KV, ALLE Lessons der Klasse (Stundenplan, `eigen`-Markierung), Roster |
+| `klasse KLASSE` | Kopf: Name, `klassen-id`, KV; mit `--details` zusätzlich ALLE Lessons (Stundenplan) + Roster (`--fach` impliziert Details) |
 | `klasse KLASSE roster\|faecher\|kv` | Teil-Sichten (TSV-Roster, Lesson-Liste mit Primary-Lehrer/Offen-Count, KV) |
 | `lesson KLASSE/FACH` | Roster des Termins zu `--datum` (Standard `heute`) |
 | `lesson K/F matrix\|termine\|info` | Anwesenheits-Matrix, Termine+Offen-Status, Diagnostik |

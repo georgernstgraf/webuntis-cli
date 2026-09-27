@@ -51,7 +51,7 @@ def cmd_klasse_kv(args: argparse.Namespace) -> int:
         return 0
     print(f"{info['name']} ({info['longName']}):")
     for tid, name in info["teachers"].items():
-        print(f"  KV: {name} (Lehrer-ID {tid})")
+        print(f"  KV: {name} (lehrer-id {tid})")
     return 0
 
 
@@ -260,33 +260,49 @@ def cmd_klasse_roster(args: argparse.Namespace) -> int:
 
 
 def cmd_klasse(args: argparse.Namespace) -> int:
-    """Klassen-Übersicht (Default): KV, Fächer und Roster.
+    """Klassen-Übersicht (Default): Kopf mit klassen-id und KV.
 
-    Nur lesend. --json liefert alles strukturiert.
+    Nur lesend. Standardmäßig nur der Kopf (Name, klassen-id, KV) —
+    Fächer und Roster nur mit --details (spart die Plan-/Overview-Calls).
+    --json liefert den Kopf immer; `range`/`lessons`/`students` nur mit
+    --details.
     """
     c = _make_client(args)
     sy = c.resolve_schoolyear_id(override=args.school_year_id)
     info = _kv_info(c, sy, args.klassenname)
-    groups, start, end = _faecher_groups(c, sy, args.klassenname,
-                                         args.start, args.end, None)
-    try:
-        rows = _klassen_roster(c, args.klassenname)
-    except RuntimeError as e:
-        print(f"Hinweis: {e}", file=sys.stderr)
-        rows = []
+    details = bool(getattr(args, "details", False)
+                   or getattr(args, "fach", None))
+    groups: list[dict] = []
+    rows: list[tuple[str, str]] = []
+    start = end = None
+    if details:
+        groups, start, end = _faecher_groups(c, sy, args.klassenname,
+                                             args.start, args.end, args.fach)
+        try:
+            rows = _klassen_roster(c, args.klassenname)
+        except RuntimeError as e:
+            print(f"Hinweis: {e}", file=sys.stderr)
+            rows = []
     if args.json:
-        print(json.dumps({
+        payload = {
             "class": info["name"],
+            "classId": info["classId"],
             "longName": info["longName"],
             "kv": info["teachers"],
-            "range": {"start": start, "end": end},
-            "lessons": groups,
-            "students": [{"name": n, "klasse": k} for n, k in rows],
-        }, indent=2, ensure_ascii=False))
+        }
+        if details:
+            payload["range"] = {"start": start, "end": end}
+            payload["lessons"] = groups
+            payload["students"] = [{"name": n, "klasse": k} for n, k in rows]
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print(f"{info['name']} ({info['longName']})")
+    print(f"  klassen-id: {info['classId']}")
     for tid, name in info["teachers"].items():
         print(f"  KV: {name}")
+    if not details:
+        print("(Fächer und Roster mit --details)", file=sys.stderr)
+        return 0
     print(f"\nFächer (alle Lessons der Klasse, Stundenplan {start}..{end}):")
     if not groups:
         print("  (keine)")

@@ -286,7 +286,7 @@ def test_resolve_lesson_picks_closest_and_warns(monkeypatch, capsys):
     assert lesson["candidates"] == [215910, 215916]
     err = capsys.readouterr().err.splitlines()
     assert err[0] == ("Warnung: mehrdeutige Lesson für 4ahwit/pmm: "
-                      "2 Kandidaten, gewählt lsId=215916 "
+                      "2 Kandidaten, gewählt lsid=215916 "
                       "(nächste zu 2026-09-18)")
     assert err[1:] == ["4AHWIT/PMM1x (2026-09-15)",
                        "4AHWIT/PMM1y (2026-09-18)"]

@@ -152,6 +152,11 @@ Read this file carefully before making changes in affected areas.
   anwesende Schüler aus dem `students`-Array (Wire-Format, englisch) zu
   streichen meldet sie ab. Immer via `_build_students_payload()` bauen
   (Klassen-Roster + alle Anwesenden jeder Klasse bleiben).
+- **Heimatklasse der Lesson-Payload**: `_build_students_payload` braucht die
+  Klassen-Menge der Lesson; ohne `--klassen-id` leitet
+  `_lesson_class_ids()` sie aus `lessonKlassen` der Matrix ab (Fallback:
+  Klassen der Anwesenden). Die Form von `lessonKlassen` (Liste von
+  `{id,…}` oder IDs) ist noch nicht per Mitschnitt belegt — defensiv lesen.
 - **UI-Schuljahr-Ansicht endet heute**: Die /open-periods-Ansicht
   „gesamtes Schuljahr" sendet `schoolYear.start`..heute (nie
   Schuljahr-Ende) — Zukunft ist per Definition nie offen. Der

@@ -17,6 +17,13 @@ Follow these without question. Do not deviate unless explicitly told.
 - Flags sind deutsch, `dest`s (args-Attribute) bleiben englisch
   (interner Code): z.B. `--schuljahr-id` mit `dest="school_year_id"`;
   nur sichtbare Strings werden übersetzt, kein Reader-Umbau
+- **ID-Bezeichner in der Textausgabe klein** (seit 2026-09-27): `lsId`
+  → `lsid`, `mainStudentgroupId` → `mainstudentgroupid`, `Absenz-ID` →
+  `absenz-id`, `Lehrer-ID` → `lehrer-id`; wo ein Flag existiert, gilt
+  dessen Schreibweise (`klassen-id`, `termin-id`, `thema-id`,
+  `absenz-id`), damit die kopierte Bezeichnung als Option passt.
+  JSON-Keys bleiben unverändert englisch-camelCase (`lsId`, `classId`,
+  …) — das Skill parst sie
 - Jede (Sub-)Gruppe bekommt `description` + `epilog` mit Beispielen —
   `wu` ohne Argumente muss selbsterklärend sein
 - Absenzen-Schalter: `--absenzen` (opt-in, `student`) — Standardausgabe

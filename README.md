@@ -130,7 +130,8 @@ umgehen: `git push --no-verify`.
 ### Klasse und Lesson
 
 ```bash
-./wu klasse 3AHWII                    # KV, alle Lessons der Klasse, Roster
+./wu klasse 3AHWII                    # Kopf: Name, klassen-id, KV
+./wu klasse 3AHWII --details          # + alle Lessons der Klasse, Roster
 ./wu klasse 3AHWII faecher            # Lessons aus dem Stundenplan
 ./wu lesson 3AHWII/SWP1x              # Roster des nächsten Termins
 ./wu lesson 3AHWII/SWP1x termine --mit-lehrstoff
@@ -141,12 +142,29 @@ umgehen: `git push --no-verify`.
 ./wu student "Erika Muster" --absenzen  # + fehlt/gehalten der eigenen Lessons
 ```
 
+`klasse` zeigt standardmäßig nur den Kopf (Name, `klassen-id` für
+`--klassen-id`, KV); Fächer und Roster kommen mit `--details` (spart
+API-Calls). In der Textausgabe sind ID-Felder klein geschrieben und
+folgen dem Flag (`lsid`, `klassen-id`, …); JSON-Keys bleiben camelCase.
+
 `student` liefert standardmäßig nur die Trefferliste (keine
 Detail-Calls). Mit `--details` kommt je Treffer die Detailausgabe:
 belegt/nicht belegt aus dem Schüler-Stundenplan (belegt = eingeschrieben,
 Anwesenheit egal); parallele Gruppen desselben Fachs werden über den
 Primary-Lehrer getrennt, `eigen`-Lessons erkannt. `--details` läuft ohne
 Matrix-Calls; `--absenzen` impliziert `--details` und ist opt-in.
+
+### Schüler in eine Lesson aufnehmen
+
+```bash
+./wu klasse 3BAIF                       # zeigt klassen-id (kann --klassen-id überschreiben)
+./wu lesson --lsid 215940 aufnehmen --schueler-name "Erika Muster"
+./wu lesson --lsid 215940 aufnehmen --schueler-name "Erika Muster" --ausfuehren
+```
+
+Die Heimatklasse wird ohne `--klassen-id` aus der Lesson abgeleitet
+(Quelle `lessonKlassen`, Fallback über die Klassen der Anwesenden); die
+abgeleitete klassen-id wird nach stderr gemeldet.
 
 ### Einzelnen Lehrstoff schreiben
 
@@ -245,6 +263,12 @@ eintragen/entfernen` (echte Abwesenheits-Einträge, Write),
 `lesson KLASSE/FACH absenzen zeigen --termin-id` (Absenz-IDs listen),
 `raum suchen/groesse` (Stubs). `klasse … faecher` zeigt jetzt ALLE
 Lessons der Klasse aus dem Stundenplan statt nur offener.
+
+Neu (2026-09-27): `klasse KLASSE` zeigt standardmäßig nur den Kopf
+(Name, `klassen-id`, KV) — Fächer und Roster nur mit `--details`.
+`--klassen-id` bei `lesson … aufnehmen/anpassen` ist optional und wird
+sonst aus der Lesson abgeleitet. ID-Felder in der Textausgabe sind klein
+geschrieben (`lsid`, `klassen-id`, …); JSON-Keys bleiben camelCase.
 
 Flag-Umbenennungen: `--school-year-id` → `--schuljahr-id`,
 `--start/--end` → `--von/--bis`, `--dry-run/--no-dry-run` →

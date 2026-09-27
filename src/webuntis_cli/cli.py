@@ -182,16 +182,19 @@ def main() -> int:
     kla = sub.add_parser(
         "klasse", help="Klasse: Übersicht, Roster, Fächer, KV",
         description="Alles zu einer Klasse (z.B. 3AHWII). Ohne Unterbefehl: "
-                    "Klassen-Übersicht mit Klassenvorstand, eigenen Fächern "
-                    "und Roster.",
+                    "Klassen-Kopf mit Klassenvorstand und klassen-id. "
+                    "Fächer und Roster nur mit --details.",
         epilog="Beispiele:\n"
                "  wu klasse 3AHWII\n"
+               "  wu klasse 3AHWII --details\n"
                "  wu klasse 3AHWII roster --ohne-kopf\n"
                "  wu klasse 3AHWII faecher --fach SWP",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     kla.add_argument("klassenname", help="Klassenname, z.B. 3AHWII")
     kla.add_argument("--fach", default=None,
-                     help="nur dieses Fach (nur Übersicht/faecher)")
+                     help="nur dieses Fach (impliziert --details)")
+    kla.add_argument("--details", dest="details", action="store_true",
+                     help="zusätzlich Fächer und Roster zeigen")
     _add_von_bis(kla, required=False)
     _add_json(kla)
     _add_school_year_arg(kla)
@@ -319,12 +322,15 @@ def main() -> int:
     les_aufnehmen = les_sub.add_parser(
         "aufnehmen", help="Schüler in die Lesson aufnehmen (Testlauf)",
         description="Schüler auf alle Lesson-Termine setzen und Payload "
-                    "schicken. --testlauf (Standard) schickt NICHT ab; "
+                    "schicken. Die Heimatklasse wird standardmäßig aus der "
+                    "Lesson abgeleitet (--klassen-id überschreibt). "
+                    "--testlauf (Standard) schickt NICHT ab; "
                     "mit --ausfuehren wirklich aufnehmen.")
     les_aufnehmen.add_argument("--klassen-id", dest="klassen_id", type=int,
-                               required=True,
+                               default=None,
                                help="Klassen-ID der Lesson-Heimatklasse "
-                                    "(deren Schüler bleiben unverändert)")
+                                    "(deren Schüler bleiben unverändert; "
+                                    "Standard: aus der Lesson abgeleitet)")
     les_aufnehmen.add_argument("--schueler-id", dest="schueler_id", type=int,
                                default=None,
                                help="Schüler-ID (alternativ --schueler-name)")
@@ -343,10 +349,13 @@ def main() -> int:
         "anpassen", help="Lesson-Anwesenheit ändern: +/- Schüler (Testlauf)",
         description="Aufnehmen und/oder entfernen in einem Write (volle "
                     "Edit-Semantik: Entfernte verlieren alle Termine). "
+                    "Die Heimatklasse wird standardmäßig aus der Lesson "
+                    "abgeleitet (--klassen-id überschreibt). "
                     "--testlauf (Standard) schickt NICHT ab.")
     les_anpassen.add_argument("--klassen-id", dest="klassen_id", type=int,
-                              required=True,
-                              help="Klassen-ID der Lesson-Heimatklasse")
+                              default=None,
+                              help="Klassen-ID der Lesson-Heimatklasse "
+                                   "(Standard: aus der Lesson abgeleitet)")
     les_anpassen.add_argument("--aufnehmen-id", dest="aufnehmen_id",
                               type=int, action="append", default=None,
                               help="aufzunehmende Schüler-ID (wiederholbar)")

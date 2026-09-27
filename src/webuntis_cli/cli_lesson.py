@@ -254,7 +254,7 @@ def _resolve_lesson_from_class_subject(
             else:
                 reason = "eigene Lesson"
             print(f"Warnung: mehrdeutige Lesson für {class_name}/{subject}: "
-                  f"{len(resolved)} Kandidaten, gewählt lsId={picked} "
+                  f"{len(resolved)} Kandidaten, gewählt lsid={picked} "
                   f"({reason})", file=sys.stderr)
             for lsid, g in sorted(resolved):
                 primary = (f" [{g['primaryTeacher']}]"
@@ -322,7 +322,7 @@ def _resolve_lesson_from_open_periods(
         picked = _pick_closest_lesson(
             {lsid: m["dates"] for lsid, m in matches.items()}, ref)
         print(f"Warnung: mehrdeutige Lesson für {class_name}/{subject}: "
-              f"{len(matches)} Kandidaten, gewählt lsId={picked} "
+              f"{len(matches)} Kandidaten, gewählt lsid={picked} "
               f"(nächste zu {ref})", file=sys.stderr)
         for lsid in sorted(matches):
             m = matches[lsid]
@@ -357,7 +357,7 @@ def _resolve_lsid(c: Client, args: argparse.Namespace,
     klasse, fach = _split_klasse_fach(args.klasse_fach)
     lesson = _resolve_lesson_from_class_subject(
         c, sy, klasse, fach, ref_date=ref_date)
-    print(f"aufgelöst {klasse}/{fach} -> lsId {lesson['lsId']} "
+    print(f"aufgelöst {klasse}/{fach} -> lsid {lesson['lsId']} "
           f"({lesson['class']}/{lesson['subject']})",
           file=sys.stderr)
     return lesson["lsId"], f"{lesson['class']}/{lesson['subject']}"
@@ -444,14 +444,14 @@ def cmd_lesson_roster(args: argparse.Namespace) -> int:
     requested_day = day
     if ymd not in period_dates:
         if not period_dates:
-            raise NotFoundError(f"keine Lesson-Termine für lsId {lsid}")
+            raise NotFoundError(f"keine Lesson-Termine für lsid {lsid}")
         # Zukunft-zuerst-Fallback: nächster kommender Termin, sonst letzter
         # gehaltener
         future = [d for d in period_dates if d > ymd]
         pick = min(future) if future else max(period_dates)
         day = f"{pick // 10000:04d}-{(pick // 100) % 100:02d}-{pick % 100:02d}"
         ymd = pick
-        print(f"Hinweis: kein Termin am {requested_day} für lsId {lsid}, "
+        print(f"Hinweis: kein Termin am {requested_day} für lsid {lsid}, "
               f"nächster Termin {day} wird verwendet", file=sys.stderr)
     try:
         overview = c.get_students_overview()
@@ -524,7 +524,7 @@ def cmd_lesson_matrix(args: argparse.Namespace) -> int:
         print(f"(Textansicht: nur Anwesende, {len(attending)}/{len(students)} "
               f"gezeigt; --alle oder --json für alle)")
         students = attending
-    print(f"lsId {lsid} (mainStudentgroupId {matrix['mainStudentgroupId']}): "
+    print(f"lsid {lsid} (mainstudentgroupid {matrix['mainStudentgroupId']}): "
           f"{len(dates)} Lesson-Termine, {len(students)} Schüler")
     for s in students:
         n = len(s["attendedPeriods"])
@@ -551,7 +551,7 @@ def cmd_lesson_termine(args: argparse.Namespace) -> int:
     periods = sorted(result.get("lessonPeriods", []),
                      key=lambda p: p.get("date", 0))
     if not periods:
-        raise NotFoundError(f"keine Lesson-Termine für lsId {lsid}")
+        raise NotFoundError(f"keine Lesson-Termine für lsid {lsid}")
     von = args.start or f"{periods[0]['date'] // 10000:04d}-01-01"
     bis = args.end or "9999-12-31"
     offen_ids: set[int] = set()
@@ -584,7 +584,7 @@ def cmd_lesson_termine(args: argparse.Namespace) -> int:
                           "termine": rows},
                          indent=2, ensure_ascii=False))
         return 0
-    label = f"{lesson_label}: " if lesson_label else f"lsId {lsid}: "
+    label = f"{lesson_label}: " if lesson_label else f"lsid {lsid}: "
     print(f"{label}{len(rows)} Termine")
     for r in rows:
         line = (f"  {r['periodId']:>10}  {r['date']}  "
@@ -638,10 +638,10 @@ def cmd_lesson_info(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(info, indent=2, ensure_ascii=False))
         return 0
-    print(f"lsId {lsid}: {info['lessonSubject']}  "
+    print(f"lsid {lsid}: {info['lessonSubject']}  "
           f"{len(periods)} Perioden "
           f"({dates[0] if dates else '-'} .. {dates[-1] if dates else '-'})")
-    print(f"  mainStudentgroupId: {info['mainStudentgroupId']}")
+    print(f"  mainstudentgroupid: {info['mainStudentgroupId']}")
     print(f"  lessonTeachers: {info['lessonTeachers']}")
     print(f"  lessonKlassen: {info['lessonKlassen']}")
     print("  Klassen-Roster vs. anwesend (nur anwesend > 0; "
@@ -656,17 +656,63 @@ def cmd_lesson_info(args: argparse.Namespace) -> int:
     return 0
 
 
-def _build_students_payload(all_students: list[dict], class_id: int,
+def _lesson_class_ids(result: dict) -> set[int]:
+    """Heimatklassen-IDs einer Lesson aus der Matrix ableiten.
+
+    Bevorzugt `lessonKlassen` (Klassen der Lesson; dicts mit `id` oder
+    nackte IDs). Fehlt das Feld, dienen die Klassen der bereits
+    anwesenden Schüler als Fallback — dann bleiben zumindest alle
+    Anwesenden (samt Klassen-Roster) erhalten. Liefert ggf. eine leere
+    Menge; der Aufrufer warnt dann nach stderr.
+    """
+    ids: set[int] = set()
+    for k in result.get("lessonKlassen") or []:
+        v = k.get("id") if isinstance(k, dict) else k
+        if isinstance(v, int):
+            ids.add(v)
+    if ids:
+        return ids
+    for s in result.get("allStudents") or []:
+        klasse = s.get("klasse")
+        if (s.get("attendedPeriods") and isinstance(klasse, int)
+                and klasse != -1):
+            ids.add(klasse)
+    return ids
+
+
+def _resolve_class_ids(args: argparse.Namespace, result: dict) -> set[int]:
+    """Heimatklassen-IDs: --klassen-id oder aus der Lesson ableiten.
+
+    Gibt die abgeleiteten IDs nach stderr aus (Transparenz) bzw. warnt,
+    wenn nichts ableitbar ist — dann bleiben nur die anwesenden Schüler
+    im Payload.
+    """
+    if args.klassen_id is not None:
+        return {args.klassen_id}
+    ids = _lesson_class_ids(result)
+    if ids:
+        label = ", ".join(str(i) for i in sorted(ids))
+        print(f"Klassen-ID {label} (aus Lesson abgeleitet; "
+              "--klassen-id überschreibt)", file=sys.stderr)
+    else:
+        print("Warnung: keine Lesson-Klasse ableitbar — nur anwesende "
+              "Schüler bleiben im Payload (--klassen-id angeben)",
+              file=sys.stderr)
+    return ids
+
+
+def _build_students_payload(all_students: list[dict], class_ids: set[int],
                             add_ids: list[int], remove_ids: list[int],
                             lesson_dates: list) -> list[dict]:
     """Teilnehmerliste für submitStudentLessonPeriodData bauen.
 
     Gemeinsame Edit-Semantik (einzige Quelle für `aufnehmen` und
-    `anpassen`): Schüler der Lesson-Klasse unverändert, bereits anwesende
-    Schüler JEDER Klasse bleiben (sie zu streichen würde sie abmelden),
-    entfernte Schüler bekommen attendedPeriods=[], aufgenommene alle
-    Lesson-Termine (mit bestehender Anwesenheit vereint). add_ids und
-    remove_ids müssen disjunkt sein — Aufrufer prüfen das.
+    `anpassen`): Schüler der Lesson-Klasse(n) unverändert, bereits
+    anwesende Schüler JEDER Klasse bleiben (sie zu streichen würde sie
+    abmelden), entfernte Schüler bekommen attendedPeriods=[],
+    aufgenommene alle Lesson-Termine (mit bestehender Anwesenheit
+    vereint). add_ids und remove_ids müssen disjunkt sein — Aufrufer
+    prüfen das.
     """
     add_set = set(add_ids)
     remove_set = set(remove_ids)
@@ -679,7 +725,7 @@ def _build_students_payload(all_students: list[dict], class_id: int,
             keep.append({"id": sid,
                          "attendedPeriods": sorted(
                              set(s["attendedPeriods"]) | set(lesson_dates))})
-        elif s["klasse"] == class_id or s["attendedPeriods"]:
+        elif s["klasse"] in class_ids or s["attendedPeriods"]:
             keep.append({"id": sid,
                          "attendedPeriods": list(s["attendedPeriods"])})
     for sid in remove_ids:
@@ -724,8 +770,10 @@ def cmd_lesson_aufnehmen(args: argparse.Namespace) -> int:
 
     Lädt die Matrix der Lesson, setzt attendedPeriods des Schülers auf
     alle Lesson-Termine und schickt die kombinierte Payload (Schüler der
-    Lesson-Klasse unverändert + aufgenommener Schüler). --testlauf
-    (Standard) schreibt die Payload nach --ausgabe und schickt NICHT ab.
+    Lesson-Klasse(n) unverändert + aufgenommener Schüler). Die
+    Heimatklasse wird ohne --klassen-id aus der Lesson abgeleitet.
+    --testlauf (Standard) schreibt die Payload nach --ausgabe und schickt
+    NICHT ab.
     """
     c = _make_client(args)
     lsid, _ = _resolve_lsid(c, args)
@@ -755,8 +803,9 @@ def cmd_lesson_aufnehmen(args: argparse.Namespace) -> int:
                         f"{len(hits)} Schüler; --schueler-id verwenden")
         target = hits[0]
 
+    class_ids = _resolve_class_ids(args, result)
     students_payload = _build_students_payload(
-        all_students, args.klassen_id, [target["id"]], [], lesson_dates)
+        all_students, class_ids, [target["id"]], [], lesson_dates)
 
     payload = {
         "mainStudentgroupId": result["mainStudentgroupId"],
@@ -785,11 +834,12 @@ def cmd_lesson_aufnehmen(args: argparse.Namespace) -> int:
 def cmd_lesson_anpassen(args: argparse.Namespace) -> int:
     """Anwesenheit einer Lesson ändern: Schüler aufnehmen und/oder entfernen.
 
-    Baut die volle Teilnehmer-Payload (Lesson-Klasse unverändert, sonstige
+    Baut die volle Teilnehmer-Payload (Lesson-Klasse(n) unverändert, sonstige
     Anwesende unverändert, Entfernte auf attendedPeriods=[], Aufgenommene
     auf alle Lesson-Termine) und schickt sie via
-    submitStudentLessonPeriodData ab. --testlauf (Standard) schreibt die
-    Payload nach --ausgabe und schickt NICHT ab.
+    submitStudentLessonPeriodData ab. Die Heimatklasse wird ohne
+    --klassen-id aus der Lesson abgeleitet. --testlauf (Standard) schreibt
+    die Payload nach --ausgabe und schickt NICHT ab.
     """
     c = _make_client(args)
     lsid, _ = _resolve_lsid(c, args)
@@ -814,8 +864,9 @@ def cmd_lesson_anpassen(args: argparse.Namespace) -> int:
             raise NotFoundError(
                 f"Schüler-ID {sid} nicht in der Matrix gefunden")
 
+    class_ids = _resolve_class_ids(args, result)
     keep = _build_students_payload(
-        all_students, args.klassen_id, add_ids, remove_ids, lesson_dates)
+        all_students, class_ids, add_ids, remove_ids, lesson_dates)
 
     payload = {
         "mainStudentgroupId": result["mainStudentgroupId"],
@@ -973,7 +1024,7 @@ def cmd_absenzen_zeigen(args: argparse.Namespace) -> int:
             }, indent=2, ensure_ascii=False))
             return 0
         desc = f", {lesson_desc}" if lesson_desc else ""
-        print(f"Termin {args.termin} (lsId {vm.get('lessonId')}{desc}), "
+        print(f"Termin {args.termin} (lsid {vm.get('lessonId')}{desc}), "
               f"Block {vm.get('blockStartTime')}-{vm.get('blockEndTime')}: "
               f"{len(rows)} Abwesenheiten")
         for r in rows:
@@ -1011,7 +1062,7 @@ def cmd_absenzen_zeigen(args: argparse.Namespace) -> int:
                           "absenzen": rows},
                          indent=2, ensure_ascii=False))
         return 0
-    label = f"{lesson_label}: " if lesson_label else f"lsId {lsid}: "
+    label = f"{lesson_label}: " if lesson_label else f"lsid {lsid}: "
     print(f"{label}{len(gehalten)} gehaltene Termine, "
           f"{len(rows)} Schüler")
     for r in rows:
@@ -1129,7 +1180,7 @@ def cmd_absenzen_eintragen(args: argparse.Namespace) -> int:
     ids = [r.get("absence", {}).get("id") for r in rows
            if r.get("absence", {}).get("id") is not None]
     if ids:
-        print(f"Abwesenheit eingetragen (Absenz-ID "
+        print(f"Abwesenheit eingetragen (absenz-id "
               f"{', '.join(str(i) for i in ids)})", file=sys.stderr)
     return 0
 
@@ -1158,7 +1209,7 @@ def cmd_absenzen_entfernen(args: argparse.Namespace) -> int:
                     == args.absenz_id), None)
         if row is None:
             raise NotFoundError(
-                f"Absenz-ID {args.absenz_id} nicht gefunden am Termin "
+                f"absenz-id {args.absenz_id} nicht gefunden am Termin "
                 f"{ttid} (`absenzen zeigen --termin-id {ttid}` prüfen)")
     else:
         assert schueler is not None
@@ -1184,7 +1235,7 @@ def cmd_absenzen_entfernen(args: argparse.Namespace) -> int:
     print(json.dumps(res, indent=2, ensure_ascii=False))
     removed = ((res.get("_data") or {}).get("removedAbsenceIds") or [])
     if removed:
-        print(f"Abwesenheit entfernt (Absenz-ID "
+        print(f"Abwesenheit entfernt (absenz-id "
               f"{', '.join(str(i) for i in removed)})", file=sys.stderr)
     return 0
 

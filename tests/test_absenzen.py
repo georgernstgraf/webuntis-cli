@@ -272,4 +272,4 @@ def test_cmd_absenzen_zeigen_termin_text_includes_desc(monkeypatch, capsys):
     rc = cli_lesson.cmd_absenzen_zeigen(args)
     assert rc == 0
     out = capsys.readouterr().out
-    assert "lsId 218000, Theorie)" in out.splitlines()[0]
+    assert "lsid 218000, Theorie)" in out.splitlines()[0]

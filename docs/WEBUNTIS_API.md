@@ -629,6 +629,13 @@ The "add student to lesson" feature. Legacy jsonrpc_web service:
   attendedPeriods:[YYYYMMDD,...]}], allKlassen, lessonKlassen, lessonTeachers}}`
 - `allStudents` = all ~3600 school students; `attendedPeriods` = list of
   lesson DATES (int YYYYMMDD) the student attends; empty = not attending.
+- `lessonKlassen` = the lesson's own classes (used since 2026-09-27 to
+  derive `--klassen-id` for `lesson … aufnehmen/anpassen`; the exact
+  shape — list of `{id,…}` or ids — is not yet pinned down in a
+  recording, so the CLI reads it defensively and falls back to the
+  classes of the attending students). `allKlassen` are ALL classes of
+  the school.
+- `allStudents.klasse` is the real class id (or `-1` without class).
 
 ### submitStudentLessonPeriodData (write!)
 
