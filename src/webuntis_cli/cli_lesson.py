@@ -772,36 +772,18 @@ def cmd_lesson_aufnehmen(args: argparse.Namespace) -> int:
     alle Lesson-Termine und schickt die kombinierte Payload (Schüler der
     Lesson-Klasse(n) unverändert + aufgenommener Schüler). Die
     Heimatklasse wird ohne --klassen-id aus der Lesson abgeleitet.
-    --testlauf (Standard) schreibt die Payload nach --ausgabe und schickt
-    NICHT ab.
+    Der Schüler wird wie in `student`/`absenzen` über students/overview
+    (Vollnamen, tokenisierend) aufgelöst. --testlauf (Standard) schreibt
+    die Payload nach --ausgabe und schickt NICHT ab.
     """
     c = _make_client(args)
     lsid, _ = _resolve_lsid(c, args)
+    target = _resolve_schueler(c, args)
     matrix = c.get_student_lesson_period_matrix(
         lsid, school_year_id=args.school_year_id)
     result = matrix["result"]
     all_students = result["allStudents"]
     lesson_dates = sorted({p["date"] for p in result["lessonPeriods"]})
-
-    target = None
-    if args.schueler_id:
-        target = next((s for s in all_students if s["id"] == args.schueler_id),
-                      None)
-        if target is None:
-            raise NotFoundError(
-                f"Schüler-ID {args.schueler_id} nicht in der Matrix gefunden")
-    else:
-        needle = args.schueler_name.lower()
-        hits = [s for s in all_students
-                if needle in s["name"].lower()]
-        if len(hits) != 1:
-            for h in hits:
-                print(f"  Kandidat: id={h['id']} {h['name']} "
-                      f"klasse={h['klasse']}", file=sys.stderr)
-            usage_error(args,
-                        f"Schülername '{args.schueler_name}' trifft "
-                        f"{len(hits)} Schüler; --schueler-id verwenden")
-        target = hits[0]
 
     class_ids = _resolve_class_ids(args, result)
     students_payload = _build_students_payload(

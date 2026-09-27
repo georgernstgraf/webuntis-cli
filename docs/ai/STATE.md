@@ -6,7 +6,7 @@ Current status as of 2026-09-27 (klasse-Kopf + klassen-id-Ableitung).
 `klasse`-Default auf den Kopf reduziert (Name, `klassen-id`, KV);
 Fächer/Roster nur mit `--details`. `--klassen-id` bei
 `aufnehmen`/`anpassen` optional (Ableitung aus `lessonKlassen`).
-Text-ID-Labels klein. Tests 144/144 grün (Unit, Fake-Clients, kein Netz).
+Text-ID-Labels klein. Tests 148/148 grün (Unit, Fake-Clients, kein Netz).
 
 ## Completed (this cycle, 2026-09-27)
 - [x] `cmd_klasse`: Standard nur Kopf inkl. `klassen-id`; `--details`
@@ -15,6 +15,9 @@ Text-ID-Labels klein. Tests 144/144 grün (Unit, Fake-Clients, kein Netz).
 - [x] `_lesson_class_ids` + `_resolve_class_ids`; `_build_students_payload`
   nimmt `class_ids: set[int]`; `--klassen-id` bei `aufnehmen`/`anpassen`
   optional (stderr-Meldung/ Warnung)
+- [x] `lesson … aufnehmen` löst `--schueler-name`/`-id` über
+  `_resolve_schueler` auf (students/overview, tokenisierend) statt per
+  Substring in den verkürzten Matrix-Namen
 - [x] Text-ID-Labels lowercase (`lsid`, `mainstudentgroupid`,
   `absenz-id`, `lehrer-id`, `klassen-id`); JSON-Keys unverändert
 - [x] Doku: man/wu.1, README, CONVENTIONS, DECISIONS, WEBUNTIS_API

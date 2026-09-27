@@ -164,7 +164,10 @@ Matrix-Calls; `--absenzen` impliziert `--details` und ist opt-in.
 
 Die Heimatklasse wird ohne `--klassen-id` aus der Lesson abgeleitet
 (Quelle `lessonKlassen`, Fallback über die Klassen der Anwesenden); die
-abgeleitete klassen-id wird nach stderr gemeldet.
+abgeleitete klassen-id wird nach stderr gemeldet. `--schueler-name` wird
+wie bei `wu student` über den aktuellen Roster (volle Namen,
+tokenisierend) aufgelöst und braucht genau einen Treffer — die verkürzten
+Matrix-Namen sind nicht die Suchquelle.
 
 ### Einzelnen Lehrstoff schreiben
 

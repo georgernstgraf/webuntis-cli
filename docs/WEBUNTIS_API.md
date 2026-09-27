@@ -629,6 +629,10 @@ The "add student to lesson" feature. Legacy jsonrpc_web service:
   attendedPeriods:[YYYYMMDD,...]}], allKlassen, lessonKlassen, lessonTeachers}}`
 - `allStudents` = all ~3600 school students; `attendedPeriods` = list of
   lesson DATES (int YYYYMMDD) the student attends; empty = not attending.
+- `allStudents[].name` is shortened and reversed (`"Nachname Vorname"` with
+  the first name cut, e.g. `"Khalil Amm"`) and must NOT be used for name
+  search — resolve names via `students/overview` (full names, joined by id),
+  as `lesson roster` and `lesson … aufnehmen` do.
 - `lessonKlassen` = the lesson's own classes (used since 2026-09-27 to
   derive `--klassen-id` for `lesson … aufnehmen/anpassen`; the exact
   shape — list of `{id,…}` or ids — is not yet pinned down in a

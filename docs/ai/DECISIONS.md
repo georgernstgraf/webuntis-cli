@@ -345,6 +345,23 @@ Superseded decisions are relocated to HISTORY.md.
 - **Tradeoff**: gemischte Konvention (Text klein, JSON camelCase) ist
   bewusst und in CONVENTIONS.md/man/wu.1 dokumentiert.
 
+## 2026-09-27: `aufnehmen` löst Namen über `_resolve_schueler` auf
+- **Choice**: `lesson … aufnehmen` löst `--schueler-name`/`--schueler-id`
+  über `_resolve_schueler` (students/overview, volle Namen, tokenisierendes
+  AND) auf — derselbe Resolver wie `student` und `absenzen eintragen`.
+  Die frühere Substring-Suche in den Matrix-`allStudents` entfällt.
+- **Reason**: Bug — die Matrix-Namen sind verkürzt/umgedreht
+  (`"Khalil Amm"`), sodass `--schueler-name "ammar khalil"` 0 Treffer
+  lieferte, obwohl `wu student` den Schüler eindeutig fand. Wer per
+  `student` genau einen Treffer hat, muss ihn auch aufnehmen können.
+- **Considered**: Token-Match gegen Matrix-`allStudents` gejoint mit
+  Overview-Vollnamen (abgelehnt — mehr Code/Pfade; `aufnehmen` betrifft
+  aktuelle Schüler, für die `students/overview` die maßgebliche Quelle ist).
+- **Tradeoff**: `summary["student"]` hat jetzt die Overview-Form
+  (`{id,name,class}`) statt der Matrix-Form; Ex-Schüler aus früheren
+  Schuljahren sind über `aufnehmen` nicht mehr per Name auflösbar (wie
+  bei `student` ohne `--alle-jahre`).
+
 
 
 

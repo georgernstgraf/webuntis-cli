@@ -26,7 +26,11 @@ Erledigt (Session 2026-09-27, Commit s. `git log`):
   `_build_students_payload` nimmt eine Klassen-Menge.
 - Text-ID-Labels klein (`lsid`, `klassen-id`, `absenz-id`, …);
   JSON-Keys bleiben camelCase.
-- Tests 144/144; `groff` warnungsfrei.
+- `lesson … aufnehmen` löst `--schueler-name`/`-id` über
+  `_resolve_schueler` auf (students/overview, tokenisierend); Bug: die
+  Substring-Suche gegen die verkürzten Matrix-Namen lieferte 0 Treffer
+  für `"ammar khalil"`.
+- Tests 148/148; `groff` warnungsfrei.
 
 Erledigt (Session 2026-09-24, #25, s. HISTORY):
 - Null-Feld-Crashs bei open-periods, `_subject_matches` nur eine
