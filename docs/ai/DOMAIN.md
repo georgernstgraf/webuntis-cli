@@ -40,8 +40,40 @@ Business rules and domain relationships not obvious from code.
 | WMC_1/WMC1 | Webprogrammierung und Mobile Computing | GRG-WMC |
 | INFIx/INF | Informatik und Informationssysteme | GRG-INFI |
 | CS | Computer Science | GRG-CS |
+| PMM/PMMx/PMMy | Prozessmanagement | GRG-PMM, GRG-PMM-T |
 | SS | Sprech- & Supplierbereitschaft | (none — skip) |
 | BESP | Berufsspezifische Praxis | (none — skip, ask user) |
+
+## Supplierungen (seit 2026-10-12 bekannt)
+
+- **AT-Terminologie: "Supplierung"** (nicht "Vertretung"). Eine
+  supplierene Periode erscheint im eigenen Arbeitsvorrat, weil
+  open-periods teacher-scoped ist — der supplierende Lehrer steht im
+  Klassen-Stundenplan-Block als `ADDED` (Original als `removed`, oder
+  `substitutionText` gesetzt).
+- **Auch supplierene Perioden verpflichten zur Lehrstoff-Eintragung.**
+  Festtext `SUPPLIER_TEXT = "Supplierung"` genügt für so eine Stunde;
+  aus den eigenen GRG-Repos ist für eine fremde Klasse nichts ableitbar.
+- `offen vorschlag` erkennt Supplierungen automatisch (source
+  `"supplier"`) und muss dafür keinen Git-Lookup-Ersatz erfinden.
+
+## Parallelklassen & Folien-Ableitung (seit 2026-10-12 bekannt)
+
+- **3BAIF und 3CAIF laufen "quasi immer gleich auf"** (Nutzer-Vorgabe):
+  dieselbe Thematik, versetzte Termine. Ein belegter UE-Ordner der einen
+  Klasse (z.B. `3caif/2026-09-23__bipartit`) gilt damit auch für den
+  nächstliegenden Termin der Parallelklasse.
+- **POS-Theorie-Inhalte kommen chronologisch aus `GRG-POSTHEORIE/
+  Folien_WS`** (Wintersemester: Graphentheorie) bzw. `Folien_SS`
+  (Sommer) — nach Dateinamen-Nummerierung vorgehen:
+  01 Einleitung → 02 Spezielle Graphen → 03 Planare Graphen →
+  04 Kantenfolgen/Euler/Hamilton → 05 Eigenschaften → 06 Zusammenhang
+  → 07 Matrizen → 08 Bäume → 09 Kirchhoff → 11 Starker Zusammenhang
+  → 12 Dijkstra (Thementabelle im README von GRG-POSTHEORIE).
+- **4AHWIT PMM: X/Y-Kohorten laufen ebenso gleich auf** (Ordner
+  `4ahwit-x`/`4ahwit-y` in GRG-PMM, y meist 3–4 Tage voraus):
+  y 25.09 „R-Kennzahlen und Verteilungen" → x 29.09; y 02.10
+  „Binomialkoeffizient/Pascalsches Dreieck" → x 06.10.
 
 ## POS-Modulstruktur (seit 2026-09-21 bekannt)
 

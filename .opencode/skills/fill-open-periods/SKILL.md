@@ -30,18 +30,31 @@ git history, and submit each via the webuntis-cli CLI.
 
    This outputs a JSON object with two arrays:
 
-   - `blocks`: one entry per day-block (class + subject + date), each with:
+   - `blocks`: one entry per DAY-block (class + subject + one date), each with:
      - `periodId`, `topicId`, `class`, `classId`, `subject`, `date`, `time`
      - `start`, `end` (block ISO timestamps for `lessonDetailsUrl`)
-     - `blockPeriods`: list of all periodIds in the block
-     - `source`: `"git"` | `"fixed"` | `"dummy"` | `"skipped"`
+     - `blockPeriods`: list of all periodIds in the day-block
+       (same-day block partners — one PUT updates them all)
+     - `source`: `"git"` | `"fixed"` | `"supplier"` | `"dummy"` | `"skipped"`
      - `proposedText`: raw text from commit messages (refine this!)
      - `commits`: array of `{repo, hash, date, message, files[], diff}` per commit
 
-   - `skipped`: periods with unknown subjects (no repo mapping)
+   Blocks are DAY-GRANULAR: a year-long lesson (same `lsId` across many
+   dates) yields one block per date, with the commits of exactly that
+   date. Never reuse one text across dates of the same lesson.
+
+   - `skipped`: periods with unknown subjects that are NOT supplier
+     lessons (rare — usually means SUBJECT_REPO_MAP needs the subject)
 
    Fixed-text subjects (SS="Sprechstunde", BESP="Bewegung und Sport") are
    already filled with their text — no formulation needed.
+
+   **Supplierungen** (`source: "supplier"`, proposedText already
+   "Supplierung"): the own teacher appears as ADDED (or the original
+   teacher as removed / substitutionText) in the class timetable.
+   Supplier lessons REQUIRE a Lehrstoff entry too — the fixed text
+   "Supplierung" suffices (Austrian terminology: Supplierung, not
+   Vertretung). Do not derive content from git for foreign classes.
 
 2. **Formulate the Lehrstoff text** for each block from:
    - The commit `diff` fields (what was added/changed — e.g. a Prisma
@@ -53,8 +66,8 @@ git history, and submit each via the webuntis-cli CLI.
      Matura-Projekt; Deno-Setup; VSCode-Konfiguration" rather than
      raw commit messages like "std; fast commit").
    - The `proposedText` is a rough starting point — improve it.
-   - For block periods (same `lsId`), use the same text — one PUT
-     updates the whole block.
+   - For block partners on the SAME day (same `lsId` + date), use the
+     same text — one PUT updates the whole day-block.
    - **POS lessons are the THEORIE module** (POS = 7 h/week: 5 h
      Java-Praxis taught by OTHER teachers + 2 h Theorie by GRG).
      GRG's own POS lessons carry the module marker in the lesson
@@ -66,6 +79,13 @@ git history, and submit each via the webuntis-cli CLI.
      There is NO GRG content for Java-Praxis — never invent it; own
      open POS periods are always theory lessons (open-periods is
      teacher-scoped).
+   - **Parallel classes run in lockstep** (user-confirmed): 3BAIF and
+     3CAIF cover the same topic with offset dates — a dated UE folder
+     of one class applies to the nearest date of the other. Same for
+     4AHWIT PMM x/y cohorts (GRG-PMM `4ahwit-x`/`4ahwit-y`, y usually
+     3–4 days ahead). POS-Theorie topics follow `Folien_WS`/
+     `Folien_SS` file numbering chronologically (README of
+     GRG-POSTHEORIE has the topic table).
 
 3. **Present a confirmation table** to the user:
 
@@ -128,7 +148,10 @@ git history, and submit each via the webuntis-cli CLI.
 
 - The `vorschlag` call replaces the old manual workflow
   (`liste --json` + per-block git lookup). One call does it all.
-- Block periods (same `lsId`) only need one PUT.
+- Day-blocks (same `lsId` + same date, e.g. double periods) only need
+  one PUT.
+- Subject repo mapping currently covers POS, SWP, WMC, INF, CS, PMM
+  (see `SUBJECT_REPO_MAP` in `src/webuntis_cli/client.py`).
 - The `.env` file is gitignored and contains the WebUntis password —
   never print it or commit it.
 - `recordings/` contains session cookies — treat as sensitive.

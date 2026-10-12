@@ -454,10 +454,29 @@ Trennt \(dqwirklich leer\(dq (kein Text) von \(dqhat Text, nur
 Absenzenpruefung fehlt\(dq \(em je Termin ein API-Call.
 .TP
 .B vorschlag
-Baut Vorschlag-JSON aus offenen Perioden + Commits/Diffs je Block
+Baut Vorschlag-JSON aus offenen Perioden + Commits/Diffs je Tages-Block
 (blocks + skipped) und gibt es aus. Schreibt nichts. Texte pruefen und
 bestaetigen, dann
 .BR "offen eintragen \-\-datei" .
+Gruppierung ist tagesgenau \(em (lsId, Datum), nicht die Jahrgangs-lsId:
+eine Lesson ueber mehrere Termine liefert je Tag einen eigenen Block mit
+den Commits genau dieses Datums; Blockpartner am selben Tag
+(Doppelperiode) teilen einen Eintrag und werden vom Server
+mit-aktualisiert.
+Textquellen in Prioritaet: (1) Festtext
+.RI ( SS ,
+.BR BESP ),
+(2) Git-Verlauf des gemappten Fach-Repos fuer genau diesen Tag,
+(3) Supplierung \(em ein supplierender Lehrer (AT-Terminologie;
+auch supplierende Perioden verpflichten zur Lehrstoff-Eintragung) wird
+am ADDED-Lehrer, dem removed-Original oder dem substitutionText im
+Klassen-Stundenplan erkannt und bekommt den Festtext
+.IR Supplierung ,
+(4) sonst
+.I dummy
+(kein Unterricht im Repo gefunden) bzw.
+.I skipped
+(weder Repo-Mapping noch Supplierung).
 Vorschlags-Format je Block:
 .IR periodId ,
 .IR topicId ,
@@ -467,9 +486,10 @@ Vorschlags-Format je Block:
 .IR end ,
 .IR date
 (plus
+.IR source ,
 .I commits
 und
-.I diffs
+.I proposedText
 als Quelle). Ausgabe eignet sich zur Weiterverarbeitung
 (z.B. per Skill/Agent).
 .TP

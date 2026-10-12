@@ -345,6 +345,36 @@ Superseded decisions are relocated to HISTORY.md.
 - **Tradeoff**: gemischte Konvention (Text klein, JSON camelCase) ist
   bewusst und in CONVENTIONS.md/man/wu.1 dokumentiert.
 
+## 2026-10-12: `vorschlag` wird tagesgenau + Supplierungs-Festtext
+- **Choice**: `offen vorschlag` gruppiert Tages-Blöcke über
+  `(lsId, Datum)` statt über die Jahrgangs-lsId — je Datum ein Block mit
+  den Commits genau dieses Datums. Ohne Git-Befund (oder ohne
+  Repo-Mapping) folgt ein Supplier-Check: steht der eigene Lehrer im
+  Klassen-Stundenplan-Block als `ADDED` (bzw. Original `removed` /
+  `substitutionText` gesetzt), bekommt der Block
+  `source: "supplier"` und den Festtext `SUPPLIER_TEXT = "Supplierung"`.
+  `SUBJECT_REPO_MAP` wurde um `"PMM": ["GRG-PMM", "GRG-PMM-T"]`
+  erweitert (Prefix-Match deckt PMMx/PMMy ab).
+- **Reason**: Die Jahrgangs-Gruppierung legte nahe, einen Text pro
+  Lesson über alle Termine zu schreiben — der `proposedText` stammte
+  aber nur vom ersten Datum (falsche Texte für die übrigen Termine).
+  Und: Nutzer unterrichtet 4AHWIT/5AHWIT (PMM, "du") — die Repos
+  existierten lokal, nur das Mapping fehlte. 5BHIF/WMC_1 (16.09.) und
+  3AHWIT/NW2 (09.09.) sind Supplierungen (`GRG[ADDED]` im
+  timetable/entries verifiziert) — auch supplierene Perioden
+  verpflichten zur Lehrstoff-Eintragung, AT-Terminologie
+  „Supplierung" (Nutzer-Vorgabe), Festtext genügt.
+- **Considered**: Supplier-Check für jeden Block (abgelehnt — nur bei
+  fehlendem Git-Befund nötig, spart API-Calls); Supplierung per
+  Nutzer-Entscheid im Bestätigungsschritt (abgelehnt — der
+  timetable-Call ist billig und deterministisch, ein API-Call je
+  unbekanntem Klasse/Datum).
+- **Tradeoff**: Ein supplierener Block mit existierendem Git-Befund
+  (fremde Klasse mit Ordner im eigenen Repo) bekäme Git-Text statt
+  „Supplierung" — praktisch ausgeschlossen, weil `get_commits_for_class`
+  den Klassennamen im Repo-Pfad auflöst und fremde Klassen dort keine
+  Ordner haben.
+
 ## 2026-09-27: `aufnehmen` löst Namen über `_resolve_schueler` auf
 - **Choice**: `lesson … aufnehmen` löst `--schueler-name`/`--schueler-id`
   über `_resolve_schueler` (students/overview, volle Namen, tokenisierendes

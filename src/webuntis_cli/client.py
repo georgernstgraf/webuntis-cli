@@ -108,6 +108,7 @@ SUBJECT_REPO_MAP: dict[str, list[str]] = {
     "WMC": ["GRG-WMC", "GRG-WMC-T"],
     "INF": ["GRG-INFI", "GRG-INFI-T"],
     "CS": ["GRG-CS", "GRG-CS-T"],
+    "PMM": ["GRG-PMM", "GRG-PMM-T"],
 }
 
 # Subjects with a fixed text (no git-log analysis needed).
@@ -115,6 +116,37 @@ FIXED_TEXT_SUBJECTS: dict[str, str] = {
     "SS": "Sprechstunde",
     "BESP": "Bewegung und Sport",
 }
+
+# Festtext für Supplierungen (Vertretungsstunden): der Lehrstoff einer
+# supplierenen Periode wird mit diesem Wort belegt — auch supplierende
+# Lehrer sind zur Lehrstoff-Eintragung verpflichtet, aber aus dem
+# Git-Verlauf der eigenen Repos ist für eine fremde Klasse nichts
+# ableitbar (AT-Terminologie: "Supplierung", nicht "Vertretung").
+SUPPLIER_TEXT: str = "Supplierung"
+
+
+def entry_is_supplier(entry: dict[str, Any]) -> bool:
+    """Heuristik: Ist dieser timetable/entries-Block eine Supplierung?
+
+    Erkennung im Roh-Grid-Block (reine Funktion, testbar):
+    - ein TEACHER-Element mit `status: "ADDED"` (der supplierende
+      Lehrer wurde in den Block eingeschoben), oder
+    - ein TEACHER-Element mit `removed` (originärer Lehrer wurde
+      herausgenommen), oder
+    - nicht-leerer `substitutionText`.
+    Der eigene Lehrbezug folgt daraus, dass open-periods teacher-scoped
+    abgefragt wird — ein fremder ADDED-Block erscheint gar nicht erst.
+    """
+    for n in range(1, 8):
+        for p in (entry.get(f"position{n}") or []):
+            cur = p.get("current")
+            if not cur or cur.get("type") != "TEACHER":
+                continue
+            if cur.get("status") == "ADDED" or p.get("removed"):
+                return True
+    if (entry.get("substitutionText") or "").strip():
+        return True
+    return False
 
 
 def _untis_date_to_iso(d: int | str) -> str:
@@ -1040,6 +1072,24 @@ class Client:
         )
         _check_status(r)
         return r.json()
+
+    def is_supplier_period(self, class_id: int, period_id: int, day: str,
+                           school_year_id: int | None = None) -> bool:
+        """True, wenn die Periode eine Supplierung ist (lesender Call).
+
+        Holt den Klassen-Stundenplan für `day` und prüft den Grid-Block,
+        der `period_id` enthält, mit `entry_is_supplier()` (ADDED-Lehrer,
+        removed-Original oder substitutionText). Periode nicht gefunden
+        -> False (keine Supplierung annehmbar).
+        """
+        data = self.get_timetable_entries(
+            "CLASS", class_id, day, day, school_year_id=school_year_id)
+        for dayblock in data.get("days", []):
+            for e in (dayblock.get("gridEntries") or []) + \
+                    (dayblock.get("dayEntries") or []):
+                if period_id in (e.get("ids") or []):
+                    return entry_is_supplier(e)
+        return False
 
     def get_calendar_entry_detail(
         self, element_type: int, element_id: int,

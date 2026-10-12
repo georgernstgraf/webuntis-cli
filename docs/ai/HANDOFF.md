@@ -17,6 +17,20 @@ Offen für später:
 - #22 `raum suchen` echte Freie-Raum-Suche (ROOM-Belegung je Slot,
   capacity-Filter; `availability`-Semantik ungeklärt).
 
+Erledigt (Session 2026-10-12, Commit s. `git log`):
+- Open-Perioden 2026/27 ausräumen: 32 Tages-Blöcke / 57 Perioden
+  eingetragen (30 Git-Befunde, 2 Supplierungen, POS aus Folien_WS,
+  PMM über Parallelklassen-Regel), 3 Absenzenprüfungen —
+  `offen verifizieren` 01.09.–12.10.: leer. Nachzug nötig für
+  Block-Partner 6236553 (Server aktualisiert Partner nicht immer).
+- `offen vorschlag` tagesgenau ((lsId, Datum), nicht Jahrgangs-lsId),
+  Supplierungs-Erkennung (ADDED-Lehrer/removed-Original/
+  substitutionText) mit Festtext „Supplierung",
+  `SUBJECT_REPO_MAP` + PMM. Tests `tests/test_vorschlag.py` (14),
+  Manpage/SKILL.md/DOMAIN.md nachgezogen.
+- Befund: 5BHIF/WMC_1 (16.09.) und 3AHWIT/NW2 (09.09.) 2026/27 sind
+  Supplierungen — erscheinen zurecht im teacher-scoped Arbeitsvorrat.
+
 Erledigt (Session 2026-09-27, Commit s. `git log`):
 - `klasse`-Default zeigt nur Kopf (Name, `klassen-id`, KV); Fächer und
   Roster nur mit `--details` (`--fach` impliziert `--details`);
@@ -36,4 +50,4 @@ Erledigt (Session 2026-09-24, #25, s. HISTORY):
 - Null-Feld-Crashs bei open-periods, `_subject_matches` nur eine
   Richtung, `student`-KeyError 'class' gefixt.
 
-Last updated: 2026-09-27
+Last updated: 2026-10-12

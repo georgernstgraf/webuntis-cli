@@ -120,14 +120,33 @@ def cmd_offen_verifizieren(args: argparse.Namespace) -> int:
 
 
 def cmd_offen_vorschlag(args: argparse.Namespace) -> int:
-    """Offene Perioden + Git-Commits/Diffs je Block laden, Vorschlag-JSON
-    für den Skill/Agenten ausgeben (immer Testlauf — schreibt nichts).
+    """Offene Perioden + Git-Commits/Diffs je Tages-Block laden,
+    Vorschlag-JSON für den Skill/Agenten ausgeben (immer Testlauf —
+    schreibt nichts).
 
     Ausgabe: JSON mit `blocks` (je Tages-Block: Perioden, Commits, Diffs,
-    proposedText) und `skipped` (Fächer ohne Repo-Mapping). Texte prüfen,
-    bestätigen, dann `offen eintragen --datei <json>` ausführen.
+    proposedText) und `skipped` (weder Repo-Mapping noch Supplierung).
+    Texte prüfen, bestätigen, dann `offen eintragen --datei <json>`
+    ausführen.
+
+    Gruppierung ist TAGESGENAU: (lsId, Datum) — eine Jahrgangs-Lesson
+    (gleiche lsId über Monate) liefert je Tag einen eigenen Block mit
+    den Commits genau dieses Datums. Blockpartner am selben Tag
+    (Doppelperiode) werden vom Server mit-aktualisiert.
+
+    Textquellen in Priorität:
+    1. Festtext (FIXED_TEXT_SUBJECTS: SS, BESP)
+    2. Git-Verlauf des gemappten Fach-Repos für genau diesen Tag
+    3. Supplierungs-Erkennung (eigener Lehrer als ADDED im Block,
+       removed-Original oder substitutionText) -> SUPPLIER_TEXT
+       (auch supplierene Perioden verpflichten zur Lehrstoff-Eintragung)
+    4. sonst: dummy (kein Unterricht im Repo gefunden) bzw. skipped
     """
-    from webuntis_cli.client import repos_for_subject, FIXED_TEXT_SUBJECTS
+    from webuntis_cli.client import (
+        SUPPLIER_TEXT,
+        FIXED_TEXT_SUBJECTS,
+        repos_for_subject,
+    )
     from webuntis_cli.gitlog import (
         get_commit_diff_by_name,
         get_commits_for_class,
@@ -138,12 +157,13 @@ def cmd_offen_vorschlag(args: argparse.Namespace) -> int:
         return _no_open_periods(args)
 
     summaries = [_period_summary(p) for p in periods]
-    # gruppiert je Lesson (lsId) — ein PUT aktualisiert alle Blockpartner;
-    # Fallback (Klasse, Fach, Datum) nur ohne lsId
+    # Tages-Blöcke: (lsId, Datum) — Fallback (Klasse, Fach, Datum) nur
+    # ohne lsId. NICHT über die Jahrgangs-lsId gruppieren: der Text ist
+    # tagesbezogen, ein PUT je Block-Partner am selben Tag reicht.
     blocks: dict[tuple, list[dict]] = defaultdict(list)
     for s in summaries:
         lsid = s.get("lsId")
-        key = ("lsid", lsid) if lsid is not None else \
+        key = ("lsid", lsid, s["date"]) if lsid is not None else \
             ("fallback", s["class"], s["subject"], s["date"])
         blocks[key].append(s)
 
@@ -185,49 +205,76 @@ def cmd_offen_vorschlag(args: argparse.Namespace) -> int:
             continue
 
         repos = repos_for_subject(subj)
-        if not repos:
-            entry["source"] = "skipped"
-            entry["proposedText"] = None
-            entry["commits"] = []
-            entry["warning"] = (
-                f"Fach '{subj}' nicht in SUBJECT_REPO_MAP — "
-                "in src/webuntis_cli/client.py ergänzen"
+        commits: list = []
+        if repos:
+            commits = get_commits_for_class(
+                cls, date.fromisoformat(d), repo_filter=repos,
             )
-            skipped.append(entry)
-            continue
 
-        commits = get_commits_for_class(
-            cls, date.fromisoformat(d), repo_filter=repos,
-        )
-        commit_data: list[dict] = []
-        for ci in commits:
-            commit_data.append({
-                "repo": ci.repo,
-                "hash": ci.hash,
-                "date": ci.date,
-                "message": ci.message,
-                "files": ci.files[:5],
-                "diff": get_commit_diff_by_name(ci.repo, ci.hash),
-            })
-        entry["commits"] = commit_data
-        if commit_data:
+        if commits:
+            commit_data: list[dict] = []
+            for ci in commits:
+                commit_data.append({
+                    "repo": ci.repo,
+                    "hash": ci.hash,
+                    "date": ci.date,
+                    "message": ci.message,
+                    "files": ci.files[:5],
+                    "diff": get_commit_diff_by_name(ci.repo, ci.hash),
+                })
+            entry["commits"] = commit_data
             entry["source"] = "git"
             msgs = [cd["message"] for cd in commit_data if cd["message"]]
             entry["proposedText"] = (
                 "; ".join(dict.fromkeys(msgs))[:240] if msgs else "(no messages)"
             )
-        else:
-            entry["source"] = "dummy"
-            entry["proposedText"] = (
-                f"(kein Unterricht gefunden für {cls} am {d})"
+            blocks_out.append(entry)
+            continue
+
+        # kein Git-Befund (oder Fach unmapped): Supplierung? Auch
+        # supplierene Perioden schulden Lehrstoff — Festtext genügt.
+        cls_id = p0.get("classId")
+        supplier = False
+        if cls_id is not None:
+            try:
+                supplier = c.is_supplier_period(
+                    cls_id, p0["periodId"], d, school_year_id=sy)
+            except Exception as e:  # Netz/Rechte: konservativ weiter
+                entry.setdefault("warning", f"Supplier-Check fehlgeschlagen: {e}")
+        if supplier:
+            entry["commits"] = []
+            entry["source"] = "supplier"
+            entry["proposedText"] = SUPPLIER_TEXT
+            blocks_out.append(entry)
+            continue
+
+        if not repos:
+            entry["source"] = "skipped"
+            entry["proposedText"] = None
+            entry["commits"] = []
+            warn = entry.pop("warning", None)
+            msg = (
+                f"Fach '{subj}' nicht in SUBJECT_REPO_MAP und keine "
+                "Supplierung — in src/webuntis_cli/client.py ergänzen "
+                "oder Text manuell formulieren"
             )
+            entry["warning"] = msg if warn is None else f"{warn}; {msg}"
+            skipped.append(entry)
+            continue
+
+        entry["commits"] = []
+        entry["source"] = "dummy"
+        entry["proposedText"] = (
+            f"(kein Unterricht gefunden für {cls} am {d})"
+        )
         blocks_out.append(entry)
 
     blocks_out.sort(key=lambda e: e.get("start") or "")
+    skipped.sort(key=lambda e: e.get("start") or "")
     output = {"blocks": blocks_out, "skipped": skipped}
     print(json.dumps(output, indent=2, ensure_ascii=False))
     print(
-        f"\n{len(blocks_out)} Blöcke ({len(skipped)} übersprungen) — "
+        f"\n{len(blocks_out)} Tages-Blöcke ({len(skipped)} übersprungen) — "
         f"Texte prüfen, dann `offen eintragen --datei <json>` ausführen",
         file=sys.stderr,
     )
