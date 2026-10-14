@@ -1273,6 +1273,48 @@ class Client:
         _check_status(r)
         return r.json()
 
+    def get_absence_dialog(self, absence_id: int,
+                           period_id: int) -> dict[str, Any]:
+        """absencedlg.do-ViewModel einer Absenz laden (lesend).
+
+        GET absencedlg.do?selId=<absenz-id>&abTimetableId=<periodId> ->
+        HTML mit (HTML-escapedem) viewModel-JSON: `students` (Person),
+        `absence` (id, Zeiten, Entschuldigungsstatus). Die Zeit-Parameter
+        (abStartTime/abEndTime) sind optional — der Dialog antwortet auch
+        ohne sie. Existiert die Absenz nicht (oder ist rechte-fremd),
+        fehlt das viewModel bzw. die Absenz im Dialog.
+        Liefert das viewModel als dict.
+        """
+        ts = int(time.time() * 1000)
+        r = _request_with_retry(
+            self.http, "GET",
+            f"{self.host}/WebUntis/absencedlg.do",
+            params={
+                "selId": absence_id,
+                "abTimetableId": period_id,
+                "request.preventCache": ts,
+            },
+            headers=lambda: {
+                "Cookie": self.session.cookie_header,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            client=self,
+        )
+        _check_status(r)
+        try:
+            vm = parse_dojo_viewmodel(r.text)
+        except ServerError as e:
+            raise NotFoundError(
+                f"Absenz-Dialog für absenz-id {absence_id} nicht lesbar "
+                f"({e})") from e
+        ab = vm.get("absence") or {}
+        if ab.get("id") != absence_id:
+            raise NotFoundError(
+                f"absenz-id {absence_id} nicht gefunden (Termin "
+                f"{period_id}) — Eintrag existiert nicht oder ist nicht "
+                "sichtbar")
+        return vm
+
     def delete_absence(self, absence: dict[str, Any],
                        period_id: int) -> dict[str, Any]:
         """Bestehende Abwesenheit entfernen (WRITE, zwei Requests).

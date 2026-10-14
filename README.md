@@ -226,6 +226,22 @@ heute, KLASSE/FACH-Adresse); Block-Standard wie in der Untis-UI
 ./wu lesson 3AHWII/SWP1x absenzen entfernen --absenz-id 3170001 --termin-id 5457498
 ```
 
+Bulk für einen später-kommenden Schüler (alle gehaltenen Termine im
+Zeitraum, ein Block-Write je Tag, nur bis heute):
+
+```bash
+./wu lesson 3AHWII/SWP1x absenzen eintragen \
+    --schueler-id STUDENT_ID --von 2025-09-15 --pause 1.5 --ausfuehren
+```
+
+Absenz per ID verifizieren — funktioniert auch für später-kommende
+Schüler, deren Eintrag der classreg-Dialog des historischen Termins
+nicht anzeigt (Person fehlt in der Teilnehmerliste des Termins):
+
+```bash
+./wu lesson 3AHWII/SWP1x absenzen zeigen --absenz-id 3170001 --termin-id 5457498
+```
+
 ### Räume (vorbereitet, noch nicht implementiert)
 
 ```bash

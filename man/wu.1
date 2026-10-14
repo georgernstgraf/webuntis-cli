@@ -349,7 +349,15 @@ inklusive Absenz-IDs (Eingabe fuer
 Hinweis: Eine eingetragene Abwesenheit (Klassenbuch) aendert die
 Matrix-Anwesenheit
 .B nicht
-\(em zwei getrennte Systeme.
+\(em zwei getrennte Systeme. Mit
+.B \-\-absenz-id
+plus
+.B \-\-termin-id\fR:
+Dialog-Existenzcheck einer einzelnen Absenz (Zeiten, Person,
+Entschuldigungsstatus). Das funktioniert auch fuer Spaeter-Kommende,
+deren Absenz der classreg-Dialog des historischen Termins NICHT
+anzeigt, weil die Person nicht in der Teilnehmerliste des Termins
+steht (der Check meldet das als Hinweis). Nur lesend.
 .TP
 .B absenzen eintragen
 Schueler abwesend eintragen (echter Klassenbuch-Eintrag, Write).
@@ -362,6 +370,21 @@ Stundenblock wie in der Untis-UI;
 .B \-\-kein-block
 traegt nur die Einzelstunde ein (braucht
 .BR \-\-termin-id ).
+Bulk-Modus mit
+.B \-\-von\fR/\fB\-\-bis\fR:
+traegt fuer ALLE gehaltenen Termine der Lesson im Zeitraum (nur bis
+heute, Spaeter-Termine werden uebersprungen) je Datum einen
+Block-Eintrag auf die erste Stunde des Blocks \(em ein Write je Tag,
+mit
+.B \-\-pause
+gedrosselt. Nicht kombinierbar mit
+.B \-\-termin-id\fR/\fB\-\-datum
+oder
+.BR \-\-kein-block .
+.B \-\-testlauf
+(Standard) zeigt die Zielliste; mit
+.B \-\-ausfuehren
+wird geschrieben.
 .TP
 .B absenzen entfernen
 Bestehende Abwesenheit loeschen (Write, Dialog-CSRF-Flow). Ziel per
@@ -674,6 +697,16 @@ wu lesson 5XZY/SWP1x absenzen eintragen \\
     --schueler-name "Erika Muster" --datum 2026-09-25
 wu lesson 5XZY/SWP1x absenzen zeigen --termin-id PERIOD_ID
 wu lesson 5XZY/SWP1x absenzen entfernen \\
+    --absenz-id ABSENCE_ID --termin-id PERIOD_ID
+.EE
+.SS Absenzen-Bulk fuer einen Spaeter-Kommenden
+.EX
+# Später-Kommender: Abwesenheit für alle gehaltenen Termine
+# seit Schuljahresstart (ein Block-Write je Tag, Testlauf zuerst)
+wu lesson 5XZY/SWP1x absenzen eintragen \\
+    --schueler-id STUDENT_ID --von 2026-09-01 --pause 1.5
+# Eintrag verifizieren, auch wenn der classreg-Dialog ihn nicht zeigt
+wu lesson 5XZY/SWP1x absenzen zeigen \\
     --absenz-id ABSENCE_ID --termin-id PERIOD_ID
 .EE
 .SS Neuen Schueler in eine Lesson aufnehmen

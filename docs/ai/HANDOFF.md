@@ -17,6 +17,28 @@ Offen für später:
 - #22 `raum suchen` echte Freie-Raum-Suche (ROOM-Belegung je Slot,
   capacity-Filter; `availability`-Semantik ungeklärt).
 
+Erledigt (Session 2026-10-14, Commit s. `git log`):
+- Später-kommenden Schüler [Details: LOCAL.md] nachträglich in allen
+  gehaltenen Stunden seit Schuljahresstart abwesend gesetzt:
+  3AHWII/SWP1x (lsid 218231, 6 Terminblöcke) und 3AHWII/INFIx
+  (lsid 214624, 5 Terminblöcke) — je Datum ein Block-Write,
+  Absenzenprüfung beider Lessons 01.09.–14.10. ausgeführt. Der
+  classreg-Dialog historischer Termine zeigt die Einträge nicht
+  (Schüler fehlt in der Teilnehmerliste) — Verifikation via
+  absencedlg.do (s. PITFALLS.md).
+- INFIx-Lehrstoff 13.10. (Perioden 6239637/6239640) eingetragen
+  (Text „Innolab", Block schreibt beide Perioden); `offen`-Status
+  01.09.–14.10. danach: 3AHWII leer.
+- Neue Features: `absenzen eintragen --von/--bis` (Bulk: ein
+  Block-Write je gehaltenem Datum, nur ≤ heute, Testlauf-Standard,
+  --pause) und `absenzen zeigen --absenz-id --termin-id`
+  (Dialog-Existenzcheck, funktioniert auch für Später-Kommende;
+  meldet Person-Nichtlisting als Hinweis). Client:
+  `get_absence_dialog()` (absencedlg.do ohne Zeit-Parameter).
+  Tests 171/171; man/wu.1, README, DECISIONS, PITFALLS nachgezogen.
+- Befund: Subparser erben das lesson-Parser-Default `--datum=heute`
+  trotz SUPPRESS (PITFALLS.md) — Bulk-Modus prüft nur `--termin-id`.
+
 Erledigt (Session 2026-10-12, Commit s. `git log`):
 - Open-Perioden 2026/27 ausräumen: 32 Tages-Blöcke / 57 Perioden
   eingetragen (30 Git-Befunde, 2 Supplierungen, POS aus Folien_WS,
@@ -50,4 +72,4 @@ Erledigt (Session 2026-09-24, #25, s. HISTORY):
 - Null-Feld-Crashs bei open-periods, `_subject_matches` nur eine
   Richtung, `student`-KeyError 'class' gefixt.
 
-Last updated: 2026-10-12
+Last updated: 2026-10-14

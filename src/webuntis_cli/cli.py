@@ -442,6 +442,11 @@ def main() -> int:
                                 help="statt Matrix: echte Abwesenheits-"
                                      "Einträge dieses Termins aus dem "
                                      "Klassenbuch (mit Absenz-IDs)")
+    les_abs_zeigen.add_argument("--absenz-id", dest="absenz_id", type=int,
+                                default=None,
+                                help="einzelne Absenz per ID prüfen "
+                                     "(Dialog-Existenzcheck, braucht "
+                                     "--termin-id als Kontext)")
     _add_json(les_abs_zeigen)
     _add_school_year_arg(les_abs_zeigen)
     les_abs_zeigen.set_defaults(func=cmd_absenzen_zeigen)
@@ -451,7 +456,9 @@ def main() -> int:
                     "--termin-id oder --datum (Standard heute, via "
                     "KLASSE/FACH). Block-Standard (ganzer Stundenblock "
                     "wie in der UI); --kein-block für eine Einzelstunde "
-                    "(braucht --termin-id). --testlauf (Standard) "
+                    "(braucht --termin-id). Bulk: --von/--bis trägt für "
+                    "alle gehaltenen Termine im Zeitraum je Datum einen "
+                    "Block-Eintrag (nur bis heute). --testlauf (Standard) "
                     "schreibt NICHT.")
     les_abs_eintragen.add_argument("--schueler-id", dest="schueler_id",
                                    type=int, default=None,
@@ -473,6 +480,11 @@ def main() -> int:
                                    action="store_true",
                                    help="nur diese Einzelstunde "
                                         "(braucht --termin-id)")
+    _add_von_bis(les_abs_eintragen, required=False)
+    les_abs_eintragen.add_argument("--pause", dest="pause", type=float,
+                                   default=1.0,
+                                   help="Pause zwischen Writes in Sekunden "
+                                        "(nur Bulk-Modus)")
     _add_testlauf(les_abs_eintragen)
     _add_school_year_arg(les_abs_eintragen)
     les_abs_eintragen.set_defaults(func=cmd_absenzen_eintragen)

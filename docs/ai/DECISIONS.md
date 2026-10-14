@@ -120,6 +120,27 @@ Superseded decisions are relocated to HISTORY.md.
 - **Tradeoff**: Stundenplan-Quelle braucht 2–3 leichte Calls statt 1
   open-periods-Call; Ferien-Fenster-Fallback nötig
 
+## 2026-10-14: Absenzen-Bulk + Absenz-Existenzcheck (`zeigen --absenz-id`)
+- **Choice**: `absenzen eintragen --von/--bis` (Bulk: ein Block-Write je
+  Datum auf die erste Stunde, nur gehaltene Termine ≤ heute, Testlauf-
+  Standard, `--pause`-Drosselung) und `absenzen zeigen --absenz-id
+  --termin-id` (Dialog-Existenzcheck via absencedlg.do; Zeiten-Parameter
+  des Dialogs sind optional). Person-Nichtlisting im classreg-Dialog
+  wird als Hinweis gemeldet.
+- **Reason**: Nutzer-Fall „später kommender Schüler soll in allen
+  vergangenen Stunden abwesend sein" war nur per Shell-Loop +
+  rohem Endpunkt-Zugriff machbar; `absenzen zeigen --termin-id` ist
+  für Später-Kommende blind (s. PITFALLS.md 2026-10-14).
+- **Considered**: vollständige Absenz-Auflistung je Termin (`--alle`)
+  — verworfen: kein enumerierender Endpunkt gefunden (REST-Guesses
+  `classreg/absences|dayabsences|studentabsences` → 404); nur
+  Dialog-per-Absenz-ID ist belegt. Ein Write je Datum statt je
+  Stunde: der Block-Write deckt beide Stunden ab
+  (`checkedAbsencesPeriodIds` enthält beide periodIds), der Server
+  merged bei Wiederholung in die bestehende Absenz (keine Dubletten).
+- **Tradeoff**: Existenzcheck braucht `--termin-id` als Dialog-Kontext;
+  Bulk ignoriert das geerbte `--datum`-Default (PITFALLS).
+
 ## 2026-09-21: Absenz-Write-Workflow (setzen/löschen) an der Lesson
 - **Choice**: `lesson K/F absenzen eintragen|entfernen` (Testlauf-Standard,
   Block-Standard, `--kein-block` nur mit --termin-id) implementieren;

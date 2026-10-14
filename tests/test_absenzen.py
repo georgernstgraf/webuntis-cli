@@ -273,3 +273,169 @@ def test_cmd_absenzen_zeigen_termin_text_includes_desc(monkeypatch, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "lsid 218000, Theorie)" in out.splitlines()[0]
+
+
+# ---------- zeigen --absenz-id (Dialog-Existenzcheck) ----------
+
+def _absdlg_html(absence_id=317000, person_id=21000, name="Muster Erika"):
+    vm = {"students": [{"id": person_id, "type": 5, "displayName": name}],
+          "absence": {"id": absence_id, "startTime": 1145, "endTime": 1325,
+                      "startDate": 20260925, "endDate": 20260925,
+                      "text": "",
+                      "person": {"id": person_id, "type": 5,
+                                 "displayName": name, "fullName": name},
+                      "excuseStatus": {"isOpen": True, "isExcused": False}}}
+    import html as _h
+    escaped = json.dumps(vm).replace('"', "&quot;")
+    return (f'<form data-dojo-props="viewModel: {escaped}" action="/x">'
+            f'</form>')
+
+
+def test_get_absence_dialog_gets_without_times():
+    c = _client([_Resp(_absdlg_html())])
+    c._session = _SessionStub()
+    vm = Client.get_absence_dialog(c, 317000, 608000)
+    get = c.http.calls[0]
+    assert get["params"]["selId"] == 317000
+    assert get["params"]["abTimetableId"] == 608000
+    assert "abStartTime" not in get["params"]
+    assert vm["absence"]["id"] == 317000
+
+
+def test_get_absence_dialog_wrong_id_raises(monkeypatch):
+    from webuntis_cli.errors import NotFoundError
+    c = _client([_Resp(_absdlg_html(absence_id=999999))])
+    c._session = _SessionStub()
+    with pytest.raises(NotFoundError, match="317000"):
+        Client.get_absence_dialog(c, 317000, 608000)
+
+
+def test_cmd_absenzen_zeigen_absenz_id_json(monkeypatch, capsys):
+    fake = _AbsFakeClient()
+    fake.vm["students"] = []  # Person NICHT in der Teilnehmerliste
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    fake.get_absence_dialog = lambda aid, pid: json.loads(json.dumps(
+        {"students": [{"id": 21000}],
+         "absence": {"id": 317000, "startTime": 1145, "endTime": 1325,
+                     "startDate": 20260925, "endDate": 20260925,
+                     "text": "", "excuseStatus": {"isOpen": True},
+                     "person": {"id": 21000,
+                                "displayName": "Muster Erika"}}}))
+    args = argparse.Namespace(termin=608000, absenz_id=317000,
+                              nur_fehlende=False, alle=False, json=True,
+                              school_year_id=None, lsid=None,
+                              klasse_fach=None)
+    rc = cli_lesson.cmd_absenzen_zeigen(args)
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["absenceId"] == 317000
+    assert payload["studentName"] == "Muster Erika"
+    assert payload["date"] == "2026-09-25"
+    assert payload["inTeilnehmerliste"] is False
+    assert "NICHT in der Teilnehmerliste" in captured.err
+
+
+def test_cmd_absenzen_zeigen_absenz_id_braucht_termin(monkeypatch):
+    from webuntis_cli.errors import UsageError
+    fake = _AbsFakeClient()
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    args = argparse.Namespace(termin=None, absenz_id=317000,
+                              nur_fehlende=False, alle=False, json=False,
+                              school_year_id=None, lsid=None,
+                              klasse_fach=None)
+    with pytest.raises(UsageError):
+        cli_lesson.cmd_absenzen_zeigen(args)
+
+
+# ---------- Bulk-Modus (--von/--bis) ----------
+
+def _bulk_matrix():
+    return {"result": {"lessonPeriods": [
+        {"id": 608000, "date": 20260908, "startTime": 850, "endTime": 940},
+        {"id": 608001, "date": 20260908, "startTime": 955, "endTime": 1045},
+        {"id": 608010, "date": 20260915, "startTime": 1145, "endTime": 1235},
+        {"id": 608020, "date": 20261201, "startTime": 850, "endTime": 940},
+        {"id": 608030, "date": 20260825, "startTime": 850, "endTime": 940},
+    ]}}
+
+
+class _BulkFakeClient(_AbsFakeClient):
+    def __init__(self):
+        super().__init__()
+        self.matrix = _bulk_matrix()
+
+    def get_schoolyears(self):
+        return [{"id": 24,
+                 "dateRange": {"start": "2026-09-01", "end": "2027-07-15"}}]
+
+    def get_student_lesson_period_matrix(self, ls_id, school_year_id=None):
+        return self.matrix
+
+
+def _bulk_args(**kw):
+    base = dict(lsid=218000, klasse_fach=None, termin=None,
+                schueler_id=21000, schueler_name=None, absenz_id=None,
+                kein_block=False, testlauf=True, school_year_id=None,
+                start="2026-09-01", end="2026-09-30", pause=0.0,
+                datum=None)
+    base.update(kw)
+    return argparse.Namespace(**base)
+
+
+def test_bulk_eintragen_testlauf_selects_block_starts(monkeypatch, capsys):
+    monkeypatch.setattr(cli_lesson, "_make_client",
+                        lambda args: _BulkFakeClient())
+    rc = cli_lesson.cmd_absenzen_eintragen(_bulk_args(end="2026-12-31"))
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    # erstes Datum: nur Block-Start 608000 (nicht 608001); Zukunft
+    # (2026-12-01) und Vor-Schuljahr (2026-08-25) uebersprungen
+    assert payload == [{"periodId": 608000, "date": "2026-09-08",
+                        "block": True},
+                       {"periodId": 608010, "date": "2026-09-15",
+                        "block": True}]
+    assert "TESTLAUF" in captured.err
+    assert "1 Termin(e) nach heute" in captured.err
+
+
+def test_bulk_eintragen_execute_writes_per_date(monkeypatch, capsys):
+    fake = _BulkFakeClient()
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    rc = cli_lesson.cmd_absenzen_eintragen(_bulk_args(testlauf=False))
+    assert rc == 0
+    assert fake.set_calls == [(608000, 21000, True), (608010, 21000, True)]
+    captured = capsys.readouterr()
+    assert "2/2 Termin(e)" in captured.err
+
+
+def test_bulk_eintragen_kein_termin_im_zeitraum(monkeypatch):
+    from webuntis_cli.errors import NotFoundError
+    fake = _BulkFakeClient()
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    with pytest.raises(NotFoundError, match="keine gehaltenen Termine"):
+        cli_lesson.cmd_absenzen_eintragen(
+            _bulk_args(start="2027-02-01", end="2027-02-28"))
+
+
+def test_bulk_eintragen_kein_block_und_termin_kombis(monkeypatch):
+    from webuntis_cli.errors import UsageError
+    fake = _BulkFakeClient()
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    with pytest.raises(UsageError, match="nicht kombinierbar"):
+        cli_lesson.cmd_absenzen_eintragen(_bulk_args(termin=608000))
+    with pytest.raises(UsageError, match="ganzen Block"):
+        cli_lesson.cmd_absenzen_eintragen(_bulk_args(kein_block=True))
+
+
+def test_bulk_eintragen_geerbtes_datum_ist_ok(monkeypatch):
+    """Subparser erben das lesson-Parser-Default datum='heute' (heute als
+    ISO-String) — der Bulk-Modus darf darauf nicht mit UsageError
+    reagieren, nur --termin-id ist ein echter Konflikt."""
+    fake = _BulkFakeClient()
+    monkeypatch.setattr(cli_lesson, "_make_client", lambda args: fake)
+    from datetime import date as _date
+    rc = cli_lesson.cmd_absenzen_eintragen(
+        _bulk_args(datum=_date.today().isoformat()))
+    assert rc == 0

@@ -1,28 +1,30 @@
 # Project State
 
-Current status as of 2026-09-27 (klasse-Kopf + klassen-id-Ableitung).
+Current status as of 2026-10-14 (Absenzen-Bulk + Absenz-Existenzcheck).
 
 ## Current Focus
-`klasse`-Default auf den Kopf reduziert (Name, `klassen-id`, KV);
-Fächer/Roster nur mit `--details`. `--klassen-id` bei
-`aufnehmen`/`anpassen` optional (Ableitung aus `lessonKlassen`).
-Text-ID-Labels klein. Tests 148/148 grün (Unit, Fake-Clients, kein Netz).
+`absenzen eintragen --von/--bis` (Bulk-Write je gehaltenem Datum,
+Block-Start, Testlauf-Standard) und `absenzen zeigen --absenz-id
+--termin-id` (absencedlg-Existenzcheck; funktioniert auch für
+Später-Kommende, die der classreg-Dialog historischer Termine nicht
+listet). Tests 171/171 grün (Unit, Fake-Clients, kein Netz).
 
-## Completed (this cycle, 2026-09-27)
-- [x] `cmd_klasse`: Standard nur Kopf inkl. `klassen-id`; `--details`
-  (und `--fach`) schalten Fächer/Roster frei; JSON-Kopf mit `classId`,
-  Listen nur mit `--details`
-- [x] `_lesson_class_ids` + `_resolve_class_ids`; `_build_students_payload`
-  nimmt `class_ids: set[int]`; `--klassen-id` bei `aufnehmen`/`anpassen`
-  optional (stderr-Meldung/ Warnung)
-- [x] `lesson … aufnehmen` löst `--schueler-name`/`-id` über
-  `_resolve_schueler` auf (students/overview, tokenisierend) statt per
-  Substring in den verkürzten Matrix-Namen
-- [x] Text-ID-Labels lowercase (`lsid`, `mainstudentgroupid`,
-  `absenz-id`, `lehrer-id`, `klassen-id`); JSON-Keys unverändert
-- [x] Doku: man/wu.1, README, CONVENTIONS, DECISIONS, WEBUNTIS_API
-- [x] Tests: test_klasse_details.py, test_lesson_aufnehmen.py,
-  write-guard-Hilfe-Check, Label-Anpassungen
+## Completed (this cycle, 2026-10-14)
+- [x] `client.get_absence_dialog(absence_id, period_id)`:
+  absencedlg.do ohne Zeit-Parameter, `parse_dojo_viewmodel`,
+  ID-Mismatch → NotFoundError
+- [x] `_absenzen_zeigen_absenz_id`: Dialog-Details + Teilnehmer-Check
+  gegen das classreg-ViewModel (Hinweis bei Nichtlisting, stdout+stderr)
+- [x] `_absenzen_eintragen_bulk`: Matrix-LessonPeriods → Zeitraum-Filter
+  (≤ heute), Gruppierung je Datum auf Block-Start, Testlauf-Liste,
+  Write-Loop mit `--pause` und Ergebnis-Summary
+- [x] Validierung: `--termin-id` kollidiert mit `--von/--bis`
+  (geerbtes `--datum`-Default bleibt erlaubt, s. PITFALLS)
+- [x] Doku: man/wu.1 (zeigen/eintragen + Beispiele), README,
+  DECISIONS, PITFALLS
+- [x] Realer Einsatz: 11 Terminblöcke (2 Lessons) Absenzen für einen
+  später-kommenden Schüler [Details: LOCAL.md], Absenzenprüfung,
+  INFIx-Lehrstoff 13.10. nachgetragen — `offen` 01.09.–14.10.: 3AHWII leer
 
 ## Pending
 - Recording-Session: `lessonKlassen`-Form belegen (read-only).
@@ -38,8 +40,9 @@ Text-ID-Labels klein. Tests 148/148 grün (Unit, Fake-Clients, kein Netz).
 ## Notes
 - Pre-Push-Hook `scripts/pre-push` läuft `pytest tests/` und blockt rote
   Pushes; pro Clone per Symlink nach `.git/hooks/pre-push` (README).
-- `lessonKlassen`-Form ist nicht aus dem Mitschnitt belegt — Ableitung
-  deshalb defensiv (dict/int) plus Attendee-Fallback.
+- `absenzen zeigen --termin-id` ist KEINE vollständige Absenz-Liste:
+  Absenzen von Später-Kommenden fehlen im classreg-Dialog (PITFALLS).
+- Subparser erben `lesson`-Defaults (`--datum=heute`) trotz SUPPRESS.
 - `dict.get(k, default)` greift NUR bei fehlendem Key — WebUntis liefert
   Felder auch als JSON `null` (s. PITFALLS.md).
 - `WuError` erbt von `RuntimeError`: Soft-Fail-Handler bleiben nutzbar.

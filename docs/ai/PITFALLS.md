@@ -172,3 +172,28 @@ Read this file carefully before making changes in affected areas.
 - **Allowed in tracked files**: counts, lesson ids (lsId), class ids,
   period ids, subject names. NOT allowed: person names, student ids,
   teacher names/ids, person-linked details.
+
+## 2026-10-14
+
+- **Später-Kommende Schüler sind im classreg-Dialog historischer Termine
+  unsichtbar**: Die `students[]`-Liste des classregpage-ViewModels enthält
+  nur Schüler, die am Termin-Datum bereits der Klasse angehörten — ein
+  später hinzugekommener Schüler fehlt in alten Terminen komplett, und
+  seine (trotzdem persistierte!) Absenz erscheint nicht in
+  `absenceRows`. Der Write selbst (`insert=insert&selId=<schueler-id>`)
+  funktioniert mit `success: true` + neuer Absenz-ID, auch wenn die
+  Person nicht in `students[]` steht. Verifikation nur über den
+  Absenz-Dialog: `GET absencedlg.do?selId=<absenz-id>&abTimetableId=`
+  <termin-id> (Zeit-Parameter optional). CLI:
+  `absenzen zeigen --absenz-id … --termin-id …` (Hinweis „NICHT in der
+  Teilnehmerliste"). Konsequenz: `absenzen zeigen --termin-id` ist KEINE
+  vollständige Absenz-Liste — ein leerer Dialog beweist nichts.
+- **Subparser erben Parser-Defaults trotz SUPPRESS**: Der
+  `lesson`-Parser definiert `--datum` mit Default `"heute"` (typ-
+  konvertiert → heutiges ISO-Datum im Namespace). Subparser deklarieren
+  `--datum` mit `default=argparse.SUPPRESS` — aber argparse seedet den
+  Subparser-Namespace mit dem Eltern-Wert, SUPPRESS überschreibt nicht.
+  `args.datum` ist in Lesson-Subkommandos also IMMER gesetzt (heute) und
+  darf nicht als „vom Nutzer explizit übergeben" interpretiert werden
+  (Betroffen: Bulk-Modus von `absenzen eintragen`, der nur
+  `--termin-id` als Konflikt prüft).

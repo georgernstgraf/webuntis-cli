@@ -965,6 +965,63 @@ def cmd_lehrstoff_aus_git(args: argparse.Namespace) -> int:
     return 0
 
 
+def _absenzen_zeigen_absenz_id(c: Client, args: argparse.Namespace) -> int:
+    """Einzelne Absenz per ID pruefen (absencedlg.do, lesend).
+
+    Echtheits-Check unabhaengig vom classreg-Dialog: dort fehlen
+    Absenzen von Schuelern, die nicht in der Teilnehmerliste des
+    historischen Termins stehen (Spaeter-Kommende) — der
+    Absenz-Dialog zeigt sie trotzdem. --termin-id liefert den
+    Dialog-Kontext (abTimetableId).
+    """
+    from webuntis_cli.client import _untis_time_to_hhmm
+    if args.termin is None:
+        usage_error(args, "--absenz-id braucht --termin-id "
+                          "(Dialog-Kontext, abTimetableId)")
+    ab_vm = c.get_absence_dialog(args.absenz_id, args.termin)
+    ab = ab_vm.get("absence") or {}
+    person = (ab.get("person") or {})
+    person_id = person.get("id")
+    # Teilnehmer-Check am Termin: steht die Person im classreg-Dialog?
+    in_dialog = None
+    try:
+        reg_vm = c.get_classreg_viewmodel(args.termin)["viewModel"]
+        in_dialog = any(s.get("id") == person_id
+                        for s in reg_vm.get("students") or [])
+    except Exception:
+        in_dialog = None
+    exc = ab.get("excuseStatus") or {}
+    entw = ("offen" if exc.get("isOpen")
+            else ("entschuldigt" if exc.get("isExcused") else "?"))
+    datum = ab.get("startDate")
+    datum_iso = (f"{str(datum)[:4]}-{str(datum)[4:6]}-{str(datum)[6:8]}"
+                 if datum else "?")
+    row = {
+        "absenceId": ab.get("id"),
+        "studentId": person_id,
+        "studentName": person.get("displayName") or person.get("fullName"),
+        "date": datum_iso,
+        "startTime": ab.get("startTime"),
+        "endTime": ab.get("endTime"),
+        "excuse": entw,
+        "text": ab.get("text") or "",
+        "inTeilnehmerliste": in_dialog,
+    }
+    if in_dialog is False:
+        print("  Hinweis: Person steht NICHT in der Teilnehmerliste des "
+              "Termins (Spaeter-Kommende/r) — der Eintrag zaehlt trotzdem.",
+              file=sys.stderr)
+    if args.json:
+        print(json.dumps(row, indent=2, ensure_ascii=False))
+        return 0
+    zeit = (f"{_untis_time_to_hhmm(ab['startTime'])}-"
+            f"{_untis_time_to_hhmm(ab['endTime'])}"
+            if ab.get("startTime") is not None else "?")
+    print(f"Absenz {ab.get('id')}: {row['studentName']}  "
+          f"{datum_iso}  {zeit}  Entschuldigung: {entw}")
+    return 0
+
+
 def cmd_absenzen_zeigen(args: argparse.Namespace) -> int:
     """Absenzen einer Lesson zeigen: je Schüler oder je Termin.
 
@@ -973,10 +1030,15 @@ def cmd_absenzen_zeigen(args: argparse.Namespace) -> int:
     die ECHTEN Abwesenheits-Einträge dieses Termins aus dem
     Klassenbuch (classregpage-ViewModel: lessonId, abwesende Schüler
     mit Absenz-ID — Basis für `absenzen entfernen --absenz-id`).
+    Mit --absenz-id: Dialog-Existenzcheck einer einzelnen Absenz
+    (Zeiten/Person, funktioniert auch für Später-Kommende, die im
+    classreg-Dialog des historischen Termins nicht gelistet sind).
     Nur lesend.
     """
     from datetime import date as _date
     c = _make_client(args)
+    if getattr(args, "absenz_id", None) is not None:
+        return _absenzen_zeigen_absenz_id(c, args)
     if args.termin is not None:
         vm_bundle = c.get_classreg_viewmodel(args.termin)
         vm = vm_bundle["viewModel"]
@@ -1139,14 +1201,28 @@ def _termin_und_block(c: Client, args: argparse.Namespace,
 def cmd_absenzen_eintragen(args: argparse.Namespace) -> int:
     """Schüler für einen Lesson-Termin abwesend eintragen (Write).
 
-    --termin-id oder --datum (Standard heute, KLASSE/FACH-Resolver);
-    Block-Standard (ganzer Stundenblock wie in der UI, --kein-block für
-    eine Einzelstunde mit --termin-id). --testlauf (Standard) zeigt nur.
+    Einzelmodus: --termin-id oder --datum (Standard heute,
+    KLASSE/FACH-Resolver); Block-Standard (ganzer Stundenblock wie in
+    der UI, --kein-block für eine Einzelstunde mit --termin-id).
+    Bulk-Modus: --von/--bis trägt für ALLE gehaltenen Termine der
+    Lesson im Zeitraum (nur bis heute) je Datum einen Block-Eintrag
+    auf die erste Stunde des Blocks. --testlauf (Standard) zeigt nur.
     Die Response enthält die neue Absenz-ID (für `entfernen`).
     """
     c = _make_client(args)
     sy = c.resolve_schoolyear_id(override=args.school_year_id)
     schueler = _resolve_schueler(c, args)
+    bulk = getattr(args, "start", None) is not None or \
+        getattr(args, "end", None) is not None
+    if bulk:
+        if args.termin is not None:
+            usage_error(args, "--von/--bis nicht kombinierbar mit "
+                              "--termin-id (--datum ist im Bulk-Modus "
+                              "irrelevant)")
+        if getattr(args, "kein_block", False):
+            usage_error(args, "--von/--bis trägt immer den ganzen Block "
+                              "ein (--kein-block entfällt)")
+        return _absenzen_eintragen_bulk(c, args, sy, schueler)
     ttid, block = _termin_und_block(c, args, sy)
     summary = {"student": schueler, "periodId": ttid, "block": block}
     if args.testlauf:
@@ -1165,6 +1241,84 @@ def cmd_absenzen_eintragen(args: argparse.Namespace) -> int:
         print(f"Abwesenheit eingetragen (absenz-id "
               f"{', '.join(str(i) for i in ids)})", file=sys.stderr)
     return 0
+
+
+def _absenzen_eintragen_bulk(c: Client, args: argparse.Namespace,
+                             sy: int, schueler: dict) -> int:
+    """Bulk-Write: Absenz je gehaltenem Termin-Block im Zeitraum.
+
+    Gehaltene Termine = Matrix-LessonPeriods mit Datum im Zeitraum und
+    <= heute; je Datum die erste Stunde (Block-Write deckt den ganzen
+    Tages-Block ab). Zukünftige Termine im Zeitraum werden uebersprungen
+    (Hinweis nach stderr).
+    """
+    from datetime import date as _date
+    from webuntis_cli.client import _untis_date_to_iso
+    lsid, label = _resolve_lsid(c, args)
+    von = args.start
+    bis = args.end or _date.today().isoformat()
+    if von is None:
+        syr = next((y for y in c.get_schoolyears()
+                    if int(y["id"]) == sy), None)
+        if syr is None:
+            raise NotFoundError(f"Schuljahr {sy} nicht gefunden")
+        von = str(syr["dateRange"]["start"])[:10]
+    heute = int(_date.today().isoformat().replace("-", ""))
+    von_i = int(von.replace("-", ""))
+    bis_i = int(bis.replace("-", ""))
+    result = c.get_student_lesson_period_matrix(
+        lsid, school_year_id=sy)["result"]
+    periods = [p for p in result.get("lessonPeriods", [])
+               if p.get("date") is not None
+               and von_i <= int(p["date"]) <= bis_i]
+    zukunft = sorted(p["date"] for p in periods if int(p["date"]) > heute)
+    if zukunft:
+        print(f"Hinweis: {len(zukunft)} Termin(e) nach heute "
+              f"({_untis_date_to_iso(max(zukunft))}) werden übersprungen "
+              "(nur gehaltene Stunden).", file=sys.stderr)
+    periods = [p for p in periods if int(p["date"]) <= heute]
+    # je Datum die erste Stunde des Blocks
+    by_date: dict[int, dict] = {}
+    for p in sorted(periods, key=lambda q: (q["date"], q.get("startTime")
+                                            or 0)):
+        by_date.setdefault(int(p["date"]), p)
+    targets = [by_date[d] for d in sorted(by_date)]
+    if not targets:
+        raise NotFoundError(
+            f"keine gehaltenen Termine der Lesson im Zeitraum {von}..{bis}")
+    print(f"{len(targets)} Termin-Block/Bloecke der Lesson "
+          f"{label or f'lsid {lsid}'} im Zeitraum {von}..{bis}",
+          file=sys.stderr)
+    if args.testlauf:
+        print(json.dumps(
+            [{"periodId": p["id"], "date": _untis_date_to_iso(p["date"]),
+              "block": True} for p in targets],
+            indent=2, ensure_ascii=False))
+        print(f"\nTESTLAUF: {schueler['name']} (id={schueler['id']}) würde "
+              f"für {len(targets)} Termin(e) abwesend eingetragen. "
+              "Abschicken mit --ausfuehren.", file=sys.stderr)
+        return 0
+    results: list[dict] = []
+    for i, p in enumerate(targets):
+        _sleep_between(i, args.pause)
+        entry: dict = {"periodId": p["id"],
+                       "date": _untis_date_to_iso(p["date"])}
+        try:
+            res = c.set_absence(p["id"], schueler["id"], block=True)
+            rows = (res.get("args") or [{}])[0].get("absenceRows") or []
+            ids = [r.get("absence", {}).get("id") for r in rows
+                   if r.get("absence", {}).get("id") is not None]
+            entry["ok"] = True
+            entry["absenceIds"] = ids
+        except Exception as e:
+            entry["ok"] = False
+            entry["error"] = str(e)
+        results.append(entry)
+    print(json.dumps(results, indent=2, ensure_ascii=False))
+    ok = sum(1 for r in results if r.get("ok"))
+    print(f"\n{ok}/{len(results)} Termin(e): Abwesenheit für "
+          f"{schueler['name']} eingetragen", file=sys.stderr)
+    return 0 if ok == len(results) else 1
 
 
 def cmd_absenzen_entfernen(args: argparse.Namespace) -> int:
